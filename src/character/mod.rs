@@ -1,7 +1,10 @@
-use bevy::prelude::*;
+use aim::AimPlugin;
+use bevy::{input::mouse::MouseWheel, prelude::*};
 use bevy_enhanced_input::prelude::*;
 
-use crate::camera::{CameraFocus, CameraTarget};
+use crate::{assets::WizardAssets, camera::{CameraFocus, CameraTarget}, GameState};
+
+pub mod aim;
 
 //==============================================================================================
 //        PlayerCharacterPlugin
@@ -12,12 +15,15 @@ pub struct PlayerCharacterPlugin;
 impl Plugin for PlayerCharacterPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_plugins(AimPlugin)
+            
             .add_input_context::<OnFoot>()
             
             .add_observer(bind_actions)
             .add_observer(move_character)
+            .add_observer(zoom_cam)
             
-            .add_systems(Startup, setup_player)
+            .add_systems(OnEnter(GameState::InGame), setup_player)
         ;
     }
 }
@@ -40,30 +46,17 @@ impl Default for PlayerCharacter {
     }
 }
 
-
 //==============================================================================================
-//        Systems
+//        Bind Key Actions
 //==============================================================================================
-
-pub fn setup_player(
-    mut commands : Commands,
-    mut meshes : ResMut<Assets<Mesh>>,
-    mut materials : ResMut<Assets<StandardMaterial>>,
-) {
-    commands.spawn((
-        Name::new("Player"),
-        PlayerCharacter::default(),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-        Mesh3d(meshes.add(Cylinder::default())),
-        MeshMaterial3d(materials.add(Color::srgb(0.8, 0.7, 0.6))),
-        CameraTarget,
-        Actions::<OnFoot>::default()
-    ));
-}
 
 #[derive(Debug, InputAction)]
 #[input_action(output = Vec2)]
 pub struct Move;
+
+#[derive(Debug, InputAction)]
+#[input_action(output = f32)]
+pub struct Zoom;
 
 #[derive(InputContext)]
 pub struct OnFoot;
@@ -74,7 +67,12 @@ pub fn bind_actions(
 ) {
     let mut actions = actions.get_mut(trigger.target()).unwrap();
     actions.bind::<Move>().to((Cardinal::wasd_keys(), Axial::left_stick()));
+    actions.bind::<Zoom>().to((Input::mouse_wheel(), GamepadAxis::LeftStickY));
 }
+
+//==============================================================================================
+//        Character Controls
+//==============================================================================================
 
 fn move_character(
     trigger : Trigger<Fired<Move>>,
@@ -88,4 +86,33 @@ fn move_character(
     let rotated_move = rotation.mul_vec3(move_value);
     player_transform.translation += rotated_move * player_character.speed * time.delta().as_secs_f32();
 }
+
+fn zoom_cam(
+    trigger : Trigger<Fired<Zoom>>,
+    mut camera_focus : Single<&mut CameraFocus>,
+    time : Res<Time>
+) {
+    let value = trigger.value;
+    camera_focus.zoom = (camera_focus.zoom + value * 0.2 * time.delta_secs()).clamp(0.0, 1.0);
+}
+
+//==============================================================================================
+//        Systems
+//==============================================================================================
+
+pub fn setup_player(
+    mut commands : Commands,
+    wizards_assets : Res<WizardAssets>
+) {
+    commands.spawn((
+        Name::new("Player"),
+        PlayerCharacter::default(),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        CameraTarget,
+        Actions::<OnFoot>::default(),
+        SceneRoot(wizards_assets.wizard.clone())
+    ));
+}
+
+
 

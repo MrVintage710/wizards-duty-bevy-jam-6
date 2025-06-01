@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::GameState;
+
 const ARENA_SIZE: f32 = 1000.0;
 
 //==============================================================================================
@@ -10,12 +12,15 @@ pub struct ArenaPlugin;
 
 impl Plugin for ArenaPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, build_arena);
+        app.add_systems(OnEnter(GameState::InGame), build_arena);
     }
 }
 
 #[derive(Component)]
 pub struct ArenaProp;
+
+#[derive(Component)]
+pub struct Ground;
 
 pub fn build_arena(
     mut commands : Commands,
@@ -32,6 +37,7 @@ pub fn build_arena(
         Mesh3d(meshes.add(Plane3d::default().mesh().size(ARENA_SIZE, ARENA_SIZE))),
         MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
         ArenaProp,
+        Ground
     ));
     
     // Test Cube

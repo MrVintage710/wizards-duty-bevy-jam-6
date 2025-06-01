@@ -1,4 +1,5 @@
 use arena::ArenaPlugin;
+use assets::{AssetLoadingPlugin, WizardAssets};
 use bevy::{prelude::*, render::camera::ScalingMode};
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
@@ -12,6 +13,22 @@ pub mod arena;
 pub mod character;
 pub mod camera;
 pub mod util;
+pub mod assets;
+
+//==============================================================================================
+//        GameState
+//==============================================================================================
+
+#[derive(States, Default, Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum GameState {
+    #[default]
+    Loading,
+    InGame,
+}
+
+//==============================================================================================
+//        Main Function
+//==============================================================================================
 
 fn main() -> AppExit {
     let mut app = App::new();
@@ -19,7 +36,11 @@ fn main() -> AppExit {
         .register_type::<PixelationEffect>()
         
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(MeshPickingPlugin)
         .add_plugins(EnhancedInputPlugin)
+        
+        //
+        .add_plugins(AssetLoadingPlugin)
         
         // Plugin that gives the pixelation effect to the camera
         .add_plugins(PixelationEffect::plugin())
@@ -35,7 +56,9 @@ fn main() -> AppExit {
         
         .add_plugins(PlayerCharacterPlugin)
         
-        .add_systems(Startup, setup)
+        .add_systems(OnEnter(GameState::InGame), setup)
+        
+        .init_state::<GameState>()
     ;
     
     // All plugins that are only used in non release builds
@@ -52,22 +75,8 @@ fn main() -> AppExit {
 /// set up a simple 3D scene
 fn setup(
     mut commands: Commands,
-    // mut pixel_cam_transform : Single<&mut Transform, With<PixelCamera>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    wizards_assets: Res<WizardAssets>,
 ) {
-    // camera
-        // commands.spawn((
-        //     Name::new("Main Camera"),
-        //     Camera3d::default(),
-        //     Projection::from(OrthographicProjection {
-        //         // 6 world units per pixel of window height.
-        //         scaling_mode: ScalingMode::FixedVertical { viewport_height: 6.0 },
-        //         ..OrthographicProjection::default_3d()
-        //     }),
-        //     PixelationEffect::default(),
-        //     Transform::from_xyz(5.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        // ));
         
         let directional_light = DirectionalLight {
             color: Color::Srgba(Srgba::rgba_u8(138, 135, 245, 255)),
@@ -80,5 +89,10 @@ fn setup(
             directional_light,
             Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 5.5, 1.0, 0.0))
         ));
-        // commands.spawn((PointLight::default(), Transform::from_xyz(3.0, 8.0, 5.0)));
+        
+        commands.spawn((
+            Name::new("Spellbook"),
+            Transform::from_xyz(0.0, 2.5, 0.0),
+            SceneRoot(wizards_assets.closed.clone())
+        ));
 }
