@@ -1,4 +1,4 @@
-use aim::AimPlugin;
+use aim::{AimPlugin, AimTarget};
 use bevy::{input::mouse::MouseWheel, prelude::*};
 use bevy_enhanced_input::prelude::*;
 
@@ -33,6 +33,10 @@ impl Plugin for PlayerCharacterPlugin {
 //==============================================================================================
 
 #[derive(Component)]
+#[require(Transform, Name::new("ShootOrigin"))]
+pub struct ShootOrigin;
+
+#[derive(Component)]
 #[require(Transform)]
 pub struct PlayerCharacter {
     speed: f32,
@@ -49,6 +53,8 @@ impl Default for PlayerCharacter {
 //==============================================================================================
 //        Bind Key Actions
 //==============================================================================================
+
+const AIM_HEIGHT: f32 = 1.0;
 
 #[derive(Debug, InputAction)]
 #[input_action(output = Vec2)]
@@ -110,7 +116,10 @@ pub fn setup_player(
         Transform::from_xyz(0.0, 0.0, 0.0),
         CameraTarget,
         Actions::<OnFoot>::default(),
-        SceneRoot(wizards_assets.wizard.clone())
+        SceneRoot(wizards_assets.wizard.clone()),
+        children![
+            (ShootOrigin, Transform::from_translation(Vec3::new(0.0, AIM_HEIGHT, 0.0)))
+        ]
     ));
 }
 

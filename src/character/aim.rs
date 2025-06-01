@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{arena::Ground, camera::MainCamera, GameState};
 
-use super::PlayerCharacter;
+use super::{PlayerCharacter, ShootOrigin, AIM_HEIGHT};
 
 //==============================================================================================
 //        Aim Plugin
@@ -31,8 +31,6 @@ pub struct AimTarget;
 //        Systems
 //==============================================================================================
 
-const AIM_HEIGHT: f32 = 1.0;
-
 fn setup_aim(
     mut commands: Commands,
 ) {
@@ -43,8 +41,8 @@ fn update_aim_target(
     camera_query: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
     ground: Single<&GlobalTransform, With<Ground>>,
     windows: Query<&Window>,
-    mut aim_target: Single<&mut Transform, (With<AimTarget>, Without<PlayerCharacter>)>,
-    player : Single<&Transform, With<PlayerCharacter>>,
+    mut aim_target: Single<&mut Transform, (With<AimTarget>, Without<ShootOrigin>)>,
+    shoot_origin : Single<&GlobalTransform, With<ShootOrigin>>,
     mut gizmos: Gizmos,
 ) {
     let Ok(windows) = windows.single() else {
@@ -70,13 +68,12 @@ fn update_aim_target(
     };
     let point = ray.get_point(distance);
     
-    let player_translation_2d = Vec2::new(player.translation.x, player.translation.z);
+    let player_translation_2d = Vec2::new(shoot_origin.translation().x, shoot_origin.translation().z);
     let point_location_2d = Vec2::new(point.x, point.z);
     let direction = (player_translation_2d - point_location_2d).normalize();
     let direction = direction * -3.0;
     let direction = Vec3::new(direction.x, 0.0, direction.y);
-    aim_target.translation = player.translation + direction;
-    aim_target.translation.y = AIM_HEIGHT;
+    aim_target.translation = shoot_origin.translation() + direction;
 
     gizmos.sphere(Isometry3d::from_translation(aim_target.translation), 0.2, Color::WHITE);
     
