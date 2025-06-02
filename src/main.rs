@@ -7,6 +7,7 @@ use bevy_tnua::prelude::*;
 use bevy_tnua_avian3d::*;
 use camera::CameraPlugin;
 use character::PlayerCharacterPlugin;
+use enemy::{EnemyPlugin, EnemyType, SpawnEnemiesEventBuilder};
 use render::{pixelate::PixelationEffect, RenderPhase};
 use spells::SpellPlugin;
 use avian3d::prelude::*;
@@ -65,7 +66,11 @@ fn main() -> AppExit {
         //This has everything to do with the player character, including movement.
         .add_plugins(PlayerCharacterPlugin)
         
+        //This will have everything needed for the spells to work
         .add_plugins(SpellPlugin)
+        
+        //This is where all of the enemy logic is.
+        .add_plugins(EnemyPlugin)
         
         .add_systems(OnEnter(GameState::InGame), setup)
         
@@ -107,6 +112,8 @@ fn setup(
         Transform::from_xyz(0.0, 2.5, 0.0),
         SceneRoot(wizards_assets.closed.clone())
     ));
+    
+    commands.trigger(SpawnEnemiesEventBuilder::new((25.0, 0.0, 25.0).into()).with_weight(EnemyType::Minion, 1).build());
 }
 
 

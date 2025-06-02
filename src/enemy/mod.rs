@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use minion::spawn_minion_enemy;
+use minion::{minion_behavior, spawn_minion_enemy};
 use strum::{EnumCount, FromRepr};
+use vleue_navigator::Path;
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
 use crate::assets::EnemyAssets;
@@ -17,7 +18,13 @@ pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        todo!()
+        app
+            .init_resource::<EnemyCount>()
+            
+            .add_observer(spawn_enemy)
+        
+            .add_systems(Update, (minion_behavior, debug_paths).chain())
+        ;
     }
 }
 
@@ -33,6 +40,25 @@ pub struct EnemyCount(u32);
 pub enum EnemyType {
     Minion,
     Mage,
+}
+
+//==============================================================================================
+//        Enemy Behaviors
+//==============================================================================================
+
+#[derive(Component, Default, Debug)]
+pub enum EnemyBehavior {
+    #[default]
+    None,
+    Guard,
+    AttackBeacon(Option<Path>, usize),
+    AttackPlayer,
+}
+
+impl EnemyBehavior {
+    pub fn attack_beacon() -> Self {
+        EnemyBehavior::AttackBeacon(None, 0)
+    }
 }
 
 //==============================================================================================
@@ -58,7 +84,7 @@ impl SpawnEnemiesEventBuilder {
     pub fn new(position: Vec3) -> Self {
         Self {
             position,
-            number_of_enemies : 3,
+            number_of_enemies : 1,
             weights : [0; EnemyType::COUNT]
         }
     }
@@ -81,8 +107,8 @@ impl SpawnEnemiesEventBuilder {
 pub fn spawn_enemy(
     trigger : Trigger<SpawnEnemiesEvent>,
     mut commands : Commands,
+    mut enemy_count: ResMut<EnemyCount>,
     enemy_assets : Res<EnemyAssets>,
-    enemy_count: Res<EnemyCount>
 ) {
     if enemy_count.0 > MAX_ENEMIES { return }
     
@@ -91,7 +117,23 @@ pub fn spawn_enemy(
             EnemyType::Minion => spawn_minion_enemy(&mut commands, trigger.0, enemy_assets.as_ref()),
             EnemyType::Mage => todo!(),
         }
+        enemy_count.0 += 1;
     }
 }
 
+pub fn debug_paths (
+    enemy_behaviors : Query<(&EnemyBehavior, &Transform)>,
+    mut gizmos : Gizmos
+) {
+    for (enemy_behavior, transform) in enemy_behaviors.iter() {
+        if let EnemyBehavior::AttackBeacon(Some(path), index) = enemy_behavior {
+            let mut points : Vec<Vec3> = vec![(transform.translation.x, 0.1, transform.translation.z).into()];
+            path.path.iter().for_each(|point| points.push(Vec3::new(point.x, 0.1, point.y)));
+            if let Some(point) = points.get(*index + 1) {
+                gizmos.sphere(Isometry3d::from_translation(*point), 0.3, bevy::color::palettes::tailwind::EMERALD_600);
+            }
+            gizmos.linestrip(points, bevy::color::palettes::tailwind::EMERALD_600);
+        }
+    }
+}
 

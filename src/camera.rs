@@ -56,7 +56,7 @@ pub struct CameraTarget;
 //        Systems
 //==============================================================================================
 
-const CAMERA_DISTANCE: f32 = 10.0;
+const CAMERA_DISTANCE: f32 = 20.0;
 
 pub fn camera_follow(
     focus : Single<(&mut Transform, &CameraFocus), Without<CameraTarget>>,
@@ -103,9 +103,4 @@ pub fn spawn_camera(
             )
         ]
     ));
-    
-    // commands.spawn((
-    //     Name::new("Camera Target"), 
-    //     CameraTarget)
-    // );
 }

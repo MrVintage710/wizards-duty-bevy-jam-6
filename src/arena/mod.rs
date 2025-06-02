@@ -1,13 +1,12 @@
-use std::{f32::consts::FRAC_PI_2, ops::Deref};
-
-use bevy::{app::DynEq, color::palettes, prelude::*, window::WindowResized};
+use std::f32::consts::FRAC_PI_2;
+use bevy::{color::palettes, prelude::*};
 use avian3d::prelude::*;
-use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshSettings, NavMeshStatus, NavMeshUpdateMode, NavmeshUpdaterPlugin}, NavMesh, NavMeshDebug, Triangulation};
+use vleue_navigator::{prelude::{NavMeshSettings, NavMeshStatus, NavMeshUpdateMode}, NavMeshDebug, Triangulation};
 use crate::GameState;
 
 pub mod beacon;
 
-const ARENA_SIZE: f32 = 500.0;
+pub const ARENA_SIZE: f32 = 50.0;
 
 //==============================================================================================
 //        ArenaPlugin
@@ -18,10 +17,6 @@ pub struct ArenaPlugin;
 impl Plugin for ArenaPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::InGame), build_arena);
-        
-        app.add_systems(Update, nav_mesh_done);
-        if cfg!(debug_assertions) {
-        }
     }
 }
 
@@ -72,6 +67,7 @@ pub fn build_arena(
             build_timeout: Some(1.0),
             simplify: 0.005,
             merge_steps: 0,
+            agent_radius : 0.4,
             ..default()
         },
         NavMeshDebug(palettes::tailwind::RED_800.into()),
@@ -81,31 +77,13 @@ pub fn build_arena(
     
     // Test Cube
     commands.spawn((
+        Name::new("Cube"),
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(Color::srgb(0.8, 0.7, 0.6))),
-        Transform::from_xyz(1.5, 0.5, 1.5),
+        Transform::from_xyz(3.5, 0.5, 3.5),
         Collider::cuboid(1.0, 1.0, 1.0),
         RigidBody::Static,
         Obstacle,
         ArenaProp
     ));
-    
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::default())),
-        MeshMaterial3d(materials.add(Color::srgb(0.8, 0.7, 0.6))),
-        Transform::from_xyz(1.5, 3.0, 1.5),
-        Collider::cuboid(1.0, 1.0, 1.0),
-        RigidBody::Static,
-        ArenaProp,
-    ));
-}
-
-//==============================================================================================
-//        For Debuging the navmesh
-//==============================================================================================
-
-fn nav_mesh_done(
-    navmesh: Single<Option<&NavMeshStatus>>,
-) {
-    println!("Navmesh Status: {:?}", *navmesh);
 }
