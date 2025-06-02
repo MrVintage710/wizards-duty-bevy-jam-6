@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, text::cosmic_text::rustybuzz::script::SHARADA};
 
 use crate::{arena::Ground, camera::MainCamera, GameState};
 
@@ -24,8 +24,8 @@ impl Plugin for AimPlugin {
 //==============================================================================================
 
 #[derive(Component)]
-#[require(Transform, Name::new("AimTarget"))]
-pub struct AimTarget;
+#[require(Transform, Name::new("ShootTarget"))]
+pub struct ShootTarget;
 
 //==============================================================================================
 //        Systems
@@ -34,14 +34,14 @@ pub struct AimTarget;
 fn setup_aim(
     mut commands: Commands,
 ) {
-    commands.spawn(AimTarget);
+    commands.spawn(ShootTarget);
 }
 
 fn update_aim_target(
     camera_query: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
     ground: Single<&GlobalTransform, With<Ground>>,
     windows: Query<&Window>,
-    mut aim_target: Single<&mut Transform, (With<AimTarget>, Without<ShootOrigin>)>,
+    mut aim_target: Single<&mut Transform, (With<ShootTarget>, Without<ShootOrigin>)>,
     shoot_origin : Single<&GlobalTransform, With<ShootOrigin>>,
     mut gizmos: Gizmos,
 ) {
@@ -76,6 +76,7 @@ fn update_aim_target(
     aim_target.translation = shoot_origin.translation() + direction;
 
     gizmos.sphere(Isometry3d::from_translation(aim_target.translation), 0.2, Color::WHITE);
+    gizmos.ray(shoot_origin.translation(), direction, Color::Srgba(Srgba::RED));
     
     // Draw a circle just above the ground plane at that position.
     gizmos.circle(

@@ -8,6 +8,7 @@ use bevy_tnua_avian3d::*;
 use camera::CameraPlugin;
 use character::PlayerCharacterPlugin;
 use render::{pixelate::PixelationEffect, RenderPhase};
+use spells::SpellPlugin;
 use util::IsometricPositionPlugin;
 use avian3d::prelude::*;
 
@@ -17,7 +18,7 @@ pub mod character;
 pub mod camera;
 pub mod util;
 pub mod assets;
-pub mod weapons;
+pub mod spells;
 
 //==============================================================================================
 //        GameState
@@ -60,7 +61,10 @@ fn main() -> AppExit {
         // This is used to calcualte all of the iso positions
         .add_plugins(IsometricPositionPlugin)
         
+        //This has everything to do with the player character, including movement.
         .add_plugins(PlayerCharacterPlugin)
+        
+        .add_plugins(SpellPlugin)
         
         .add_systems(OnEnter(GameState::InGame), setup)
         

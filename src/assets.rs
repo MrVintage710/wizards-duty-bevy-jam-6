@@ -15,6 +15,7 @@ impl Plugin for AssetLoadingPlugin {
             LoadingState::new(GameState::Loading)
                 .continue_to_state(GameState::InGame)
                 .load_collection::<WizardAssets>()
+                .load_collection::<SpellAssets>()
         );
     }
 }
@@ -35,4 +36,14 @@ pub struct WizardAssets {
 
 pub struct WizardAnimationGraph {
     pub graph: Handle<AnimationGraph>,
+}
+
+//==============================================================================================
+//        Spell Assets
+//==============================================================================================
+
+#[derive(AssetCollection, Resource)]
+pub struct SpellAssets {
+    #[asset(path = "models/spell/dagger.gltf#Scene0")]
+    pub dagger : Handle<Scene>
 }

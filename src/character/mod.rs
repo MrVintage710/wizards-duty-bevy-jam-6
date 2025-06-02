@@ -1,11 +1,11 @@
-use aim::{AimPlugin, AimTarget};
+use aim::{AimPlugin, ShootTarget};
 use avian3d::{dynamics::rigid_body, prelude::{Collider, Friction, LinearVelocity, LockedAxes, RigidBody}};
 use bevy::{input::mouse::MouseWheel, math::VectorSpace, prelude::*};
 use bevy_enhanced_input::prelude::*;
 use bevy_tnua::{controller, prelude::{TnuaBuiltinWalk, TnuaController}};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 
-use crate::{assets::WizardAssets, camera::{CameraFocus, CameraTarget}, GameState};
+use crate::{assets::WizardAssets, camera::{CameraFocus, CameraTarget}, spells::{CastSpell, Spellbook}, GameState};
 
 pub mod aim;
 
@@ -24,6 +24,7 @@ impl Plugin for PlayerCharacterPlugin {
             
             .add_observer(bind_actions)
             .add_observer(zoom_cam)
+            .add_observer(cast_spell)
             
             .add_systems(OnEnter(GameState::InGame), setup_player)
             .add_systems(Update, move_character)
@@ -44,6 +45,9 @@ pub struct ShootOrigin;
 pub struct PlayerCharacter {
     speed: f32,
 }
+
+#[derive(Component)]
+pub struct PlayerModelRoot;
 
 impl Default for PlayerCharacter {
     fn default() -> Self {
@@ -67,6 +71,10 @@ pub struct Move;
 #[input_action(output = f32)]
 pub struct Zoom;
 
+#[derive(Debug, InputAction)]
+#[input_action(output = bool)]
+pub struct EvokeSpell;
+
 #[derive(InputContext)]
 pub struct OnFoot;
 
@@ -77,6 +85,7 @@ pub fn bind_actions(
     let mut actions = actions.get_mut(trigger.target()).unwrap();
     actions.bind::<Move>().to((Cardinal::wasd_keys(), Axial::left_stick()));
     actions.bind::<Zoom>().to((Input::mouse_wheel(), GamepadAxis::LeftStickY));
+    actions.bind::<EvokeSpell>().to((MouseButton::Left, GamepadButton::RightTrigger));
 }
 
 //==============================================================================================
@@ -101,10 +110,9 @@ fn move_character(
     
     controller.basis(TnuaBuiltinWalk {
         desired_velocity: move_vector,
-        float_height: 1.5,
+        float_height: 1.0,
         ..default()
     });
-    // player_transform.translation += rotated_move * player_character.speed * time.delta_secs();
 }
 
 fn zoom_cam(
@@ -114,6 +122,27 @@ fn zoom_cam(
 ) {
     let value = trigger.value;
     camera_focus.zoom = (camera_focus.zoom + value * 0.2 * time.delta_secs()).clamp(0.0, 1.0);
+}
+
+fn cast_spell (
+    _trigger : Trigger<Fired<EvokeSpell>>,
+    mut commands : Commands,
+    shoot_origin : Single<&Transform, With<ShootOrigin>>,
+    shoot_target : Single<&Transform, With<ShootTarget>>,
+    spellbook : Res<Spellbook>,
+    mut gizmos : Gizmos
+) {
+    let direction = shoot_target.translation - shoot_origin.translation;
+    let direction = Vec2::new(direction.x, direction.z).normalize();
+    gizmos.ray(shoot_origin.translation, Vec3::new(direction.x, 0.0, direction.y), Color::srgb(1.0, 0.0, 0.0));
+    if spellbook.cooldown.finished() {
+        info!("{direction}");
+        commands.trigger(CastSpell {
+            position: shoot_origin.translation,
+            direction,
+            spell_index: 0,
+        });   
+    }
 }
 
 //==============================================================================================
@@ -129,7 +158,7 @@ pub fn setup_player(
         Transform::from_translation(Vec3::new(0.0, AIM_HEIGHT, 0.0)), 
         CameraTarget,
         RigidBody::Dynamic,
-        Collider::capsule(0.5, 1.5),
+        Collider::capsule(0.5, 0.5),
         Actions::<OnFoot>::default(),
         PlayerCharacter::default(),
         Name::new("Player"),
@@ -144,6 +173,7 @@ pub fn setup_player(
             (
                 Transform::from_xyz(0.0, -AIM_HEIGHT, 0.0),
                 SceneRoot(wizards_assets.wizard.clone()),
+                PlayerModelRoot
             )
         ]
     ));
