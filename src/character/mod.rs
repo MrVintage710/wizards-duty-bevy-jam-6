@@ -1,6 +1,9 @@
 use aim::{AimPlugin, AimTarget};
-use bevy::{input::mouse::MouseWheel, prelude::*};
+use avian3d::{dynamics::rigid_body, prelude::{Collider, Friction, LinearVelocity, LockedAxes, RigidBody}};
+use bevy::{input::mouse::MouseWheel, math::VectorSpace, prelude::*};
 use bevy_enhanced_input::prelude::*;
+use bevy_tnua::{controller, prelude::{TnuaBuiltinWalk, TnuaController}};
+use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 
 use crate::{assets::WizardAssets, camera::{CameraFocus, CameraTarget}, GameState};
 
@@ -20,10 +23,10 @@ impl Plugin for PlayerCharacterPlugin {
             .add_input_context::<OnFoot>()
             
             .add_observer(bind_actions)
-            .add_observer(move_character)
             .add_observer(zoom_cam)
             
             .add_systems(OnEnter(GameState::InGame), setup_player)
+            .add_systems(Update, move_character)
         ;
     }
 }
@@ -81,16 +84,27 @@ pub fn bind_actions(
 //==============================================================================================
 
 fn move_character(
-    trigger : Trigger<Fired<Move>>,
-    mut query : Query<(&mut Transform, &PlayerCharacter)>,
+    query : Single<(&mut TnuaController, &Actions<OnFoot>, &PlayerCharacter)>,
     cam_focus : Single<&CameraFocus>,
-    time : Res<Time>
 ) {
-    let (mut player_transform, player_character) = query.get_mut(trigger.target()).unwrap();
-    let move_value = Vec3::new(trigger.value.x, 0.0, -trigger.value.y).normalize();
-    let rotation = Quat::from_euler(EulerRot::XYZ, 0.0, cam_focus.rotation.to_radians(), 0.0);
-    let rotated_move = rotation.mul_vec3(move_value);
-    player_transform.translation += rotated_move * player_character.speed * time.delta().as_secs_f32();
+    let (mut controller, actions, player_character) = query.into_inner();
+    
+    let mut move_vector = Vec3::ZERO;
+    
+    if actions.state::<Move>().unwrap() == ActionState::Fired {
+        let in_move = actions.value::<Move>().unwrap().as_axis2d();
+        let move_value = Vec3::new(in_move.x, 0.0, -in_move.y).normalize_or_zero();
+        let rotation = Quat::from_euler(EulerRot::XYZ, 0.0, cam_focus.rotation.to_radians(), 0.0);
+        let rotated_move = rotation.mul_vec3(move_value);
+        move_vector = rotated_move * player_character.speed;
+    }
+    
+    controller.basis(TnuaBuiltinWalk {
+        desired_velocity: move_vector,
+        float_height: 1.5,
+        ..default()
+    });
+    // player_transform.translation += rotated_move * player_character.speed * time.delta_secs();
 }
 
 fn zoom_cam(
@@ -111,14 +125,26 @@ pub fn setup_player(
     wizards_assets : Res<WizardAssets>
 ) {
     commands.spawn((
-        Name::new("Player"),
-        PlayerCharacter::default(),
-        Transform::from_xyz(0.0, 0.0, 0.0),
+        ShootOrigin, 
+        Transform::from_translation(Vec3::new(0.0, AIM_HEIGHT, 0.0)), 
         CameraTarget,
+        RigidBody::Dynamic,
+        Collider::capsule(0.5, 1.5),
         Actions::<OnFoot>::default(),
-        SceneRoot(wizards_assets.wizard.clone()),
+        PlayerCharacter::default(),
+        Name::new("Player"),
+        
+        TnuaController::default(),
+        // A sensor shape is not strictly necessary, but without it we'll get weird results.
+        TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
+        // Tnua can fix the rotation, but the character will still get rotated before it can do so.
+        // By locking the rotation we can prevent this.
+        LockedAxes::ROTATION_LOCKED,
         children![
-            (ShootOrigin, Transform::from_translation(Vec3::new(0.0, AIM_HEIGHT, 0.0)))
+            (
+                Transform::from_xyz(0.0, -AIM_HEIGHT, 0.0),
+                SceneRoot(wizards_assets.wizard.clone()),
+            )
         ]
     ));
 }

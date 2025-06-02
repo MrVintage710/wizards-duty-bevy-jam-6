@@ -16,7 +16,7 @@ impl Plugin for CameraPlugin {
         app
             .register_type::<CameraFocus>()
             .add_systems(PreStartup, spawn_camera)
-            .add_systems(PreUpdate, camera_follow)
+            .add_systems(PostUpdate, camera_follow)
         ;
     }
 }
@@ -60,12 +60,12 @@ const CAMERA_DISTANCE: f32 = 10.0;
 
 pub fn camera_follow(
     focus : Single<(&mut Transform, &CameraFocus), Without<CameraTarget>>,
-    target: Single<&Transform, With<CameraTarget>>,
+    target: Single<&GlobalTransform, With<CameraTarget>>,
     mut cam : Single<&mut Projection, With<MainCamera>>,
     time : Res<Time>
 ) {
     let (mut camera_focus_transform, cam_focus) = focus.into_inner();
-    camera_focus_transform.translation = camera_focus_transform.translation.move_towards(target.translation, cam_focus.speed * time.delta_secs());
+    camera_focus_transform.translation = camera_focus_transform.translation.move_towards(target.translation(), cam_focus.speed * time.delta_secs());
     camera_focus_transform.rotation = Quat::from_rotation_y(cam_focus.rotation.to_radians());
     
     if let Projection::Orthographic(ortho) = cam.as_mut() {
@@ -97,7 +97,7 @@ pub fn spawn_camera(
                     scaling_mode: bevy::render::camera::ScalingMode::FixedVertical { viewport_height: 6.0 },
                     ..OrthographicProjection::default_3d()
                 }),
-                PixelationEffect::default(),
+                // PixelationEffect::default(),
                 camera_transform,
                 MainCamera,
             )

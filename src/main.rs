@@ -1,12 +1,15 @@
 use arena::ArenaPlugin;
 use assets::{AssetLoadingPlugin, WizardAssets};
-use bevy::{prelude::*, render::camera::ScalingMode};
+use bevy::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
+use bevy_tnua::prelude::*;
+use bevy_tnua_avian3d::*;
 use camera::CameraPlugin;
 use character::PlayerCharacterPlugin;
 use render::{pixelate::PixelationEffect, RenderPhase};
 use util::IsometricPositionPlugin;
+use avian3d::prelude::*;
 
 pub mod render;
 pub mod arena;
@@ -14,6 +17,7 @@ pub mod character;
 pub mod camera;
 pub mod util;
 pub mod assets;
+pub mod weapons;
 
 //==============================================================================================
 //        GameState
@@ -38,6 +42,8 @@ fn main() -> AppExit {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(MeshPickingPlugin)
         .add_plugins(EnhancedInputPlugin)
+        .add_plugins(PhysicsPlugins::default())
+        .add_plugins((TnuaControllerPlugin::new(FixedUpdate), TnuaAvian3dPlugin::new(FixedUpdate)))
         
         //
         .add_plugins(AssetLoadingPlugin)
@@ -66,6 +72,8 @@ fn main() -> AppExit {
         app
             .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
             .add_plugins(WorldInspectorPlugin::new())
+            .add_plugins(PhysicsDebugPlugin::default())
+            .insert_gizmo_config(PhysicsGizmos::default(), GizmoConfig::default())
         ;
     }
     
@@ -96,3 +104,5 @@ fn setup(
             SceneRoot(wizards_assets.closed.clone())
         ));
 }
+
+
