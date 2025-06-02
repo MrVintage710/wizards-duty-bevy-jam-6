@@ -50,7 +50,7 @@ pub struct PhantomBladeSpellEffect(Timer);
 
 impl Default for PhantomBladeSpellEffect {
     fn default() -> Self {
-        PhantomBladeSpellEffect(Timer::from_seconds(0.7, TimerMode::Once))
+        PhantomBladeSpellEffect(Timer::from_seconds(0.5, TimerMode::Once))
     }
 }
 
@@ -60,7 +60,7 @@ pub fn phantom_blade_spell_effect(
     time : Res<Time>
 ) {
     for (entity, mut transform, mut effect) in daggers.iter_mut() {
-        let move_vector = transform.forward() * 10.0 * time.delta_secs();
+        let move_vector = transform.forward() * 20.0 * time.delta_secs();
         transform.translation += move_vector;
         
         effect.0.tick(time.delta());

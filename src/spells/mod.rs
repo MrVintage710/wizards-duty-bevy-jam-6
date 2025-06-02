@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{f32::consts::PI, marker::PhantomData};
 
 use avian3d::{position, sync};
 use bevy::{prelude::*, render::render_resource::ShaderSize};
@@ -77,9 +77,9 @@ fn cast_spell(
     };
     let direction = trigger.direction;
     // gizmos.ray(trigger.position, Vec3::new(direction.x, 0.0, direction.y), Color::srgb(1.0, 0.0, 0.0));
-    let angle = direction.y.atan2(direction.x);
+    let angle = -direction.to_angle();
     info!("Angle: {}", angle.to_degrees());
-    let transform = Transform::from_translation(trigger.position).with_rotation(Quat::from_rotation_y(angle));
+    let transform = Transform::from_translation(trigger.position).with_rotation(Quat::from_rotation_y(angle - PI / 2.0));
     spell.cast(commands, transform, spell_assets.as_ref());
     spellbook.cooldown.reset();
 }

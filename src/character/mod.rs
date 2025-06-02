@@ -132,9 +132,9 @@ fn cast_spell (
     spellbook : Res<Spellbook>,
     mut gizmos : Gizmos
 ) {
-    let direction = shoot_target.translation - shoot_origin.translation;
-    let direction = Vec2::new(direction.x, direction.z).normalize();
-    gizmos.ray(shoot_origin.translation, Vec3::new(direction.x, 0.0, direction.y), Color::srgb(1.0, 0.0, 0.0));
+    let target_2d = Vec2::new(shoot_target.translation.x, shoot_target.translation.z);
+    let origin_2d = Vec2::new(shoot_origin.translation.x, shoot_origin.translation.z);
+    let direction = (target_2d - origin_2d).normalize_or_zero();    gizmos.ray(shoot_origin.translation, Vec3::new(direction.x, 0.0, direction.y), Color::srgb(1.0, 0.0, 0.0));
     if spellbook.cooldown.finished() {
         info!("{direction}");
         commands.trigger(CastSpell {

@@ -76,7 +76,7 @@ fn update_aim_target(
     aim_target.translation = shoot_origin.translation() + direction;
 
     gizmos.sphere(Isometry3d::from_translation(aim_target.translation), 0.2, Color::WHITE);
-    gizmos.ray(shoot_origin.translation(), direction, Color::Srgba(Srgba::RED));
+    // gizmos.ray(shoot_origin.translation(), direction, Color::Srgba(Srgba::RED));
     
     // Draw a circle just above the ground plane at that position.
     gizmos.circle(
