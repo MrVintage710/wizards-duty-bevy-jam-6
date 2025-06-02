@@ -9,7 +9,6 @@ use camera::CameraPlugin;
 use character::PlayerCharacterPlugin;
 use render::{pixelate::PixelationEffect, RenderPhase};
 use spells::SpellPlugin;
-use util::IsometricPositionPlugin;
 use avian3d::prelude::*;
 
 pub mod render;
@@ -19,6 +18,7 @@ pub mod camera;
 pub mod util;
 pub mod assets;
 pub mod spells;
+pub mod enemy;
 
 //==============================================================================================
 //        GameState
@@ -57,9 +57,6 @@ fn main() -> AppExit {
         
         // This spawns and manages the camera
         .add_plugins(CameraPlugin)
-        
-        // This is used to calcualte all of the iso positions
-        .add_plugins(IsometricPositionPlugin)
         
         //This has everything to do with the player character, including movement.
         .add_plugins(PlayerCharacterPlugin)

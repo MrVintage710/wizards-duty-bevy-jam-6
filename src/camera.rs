@@ -2,7 +2,7 @@
 use bevy::{pbr::Atmosphere, prelude::*, render::camera::ScalingMode};
 use bevy_inspector_egui::InspectorOptions;
 
-use crate::{render::pixelate::PixelationEffect, util::IsometricPosition};
+use crate::{render::pixelate::PixelationEffect};
 
 //==============================================================================================
 //        CameraPlugin

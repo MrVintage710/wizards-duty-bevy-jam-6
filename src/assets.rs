@@ -16,6 +16,7 @@ impl Plugin for AssetLoadingPlugin {
                 .continue_to_state(GameState::InGame)
                 .load_collection::<WizardAssets>()
                 .load_collection::<SpellAssets>()
+                .load_collection::<EnemyAssets>()
         );
     }
 }
@@ -46,4 +47,16 @@ pub struct WizardAnimationGraph {
 pub struct SpellAssets {
     #[asset(path = "models/spell/dagger.gltf#Scene0")]
     pub dagger : Handle<Scene>
+}
+
+//==============================================================================================
+//        Enemy Assets
+//==============================================================================================
+
+#[derive(AssetCollection, Resource)]
+pub struct EnemyAssets {
+    #[asset(path = "models/enemy/Skeleton_Minion.glb#Scene0")]
+    pub skeleton_minion: Handle<Scene>,
+    #[asset(path = "models/enemy/Skeleton_Mage.glb#Scene0")]
+    pub skeleton_mage: Handle<Scene>,
 }

@@ -28,6 +28,13 @@ impl Plugin for SpellPlugin {
 }
 
 //==============================================================================================
+//        Util Structs
+//==============================================================================================
+
+#[derive(Component)]
+struct SpellDamage(u32);
+
+//==============================================================================================
 //        WeaponComponent
 //==============================================================================================
 
@@ -76,9 +83,7 @@ fn cast_spell(
         return;
     };
     let direction = trigger.direction;
-    // gizmos.ray(trigger.position, Vec3::new(direction.x, 0.0, direction.y), Color::srgb(1.0, 0.0, 0.0));
     let angle = -direction.to_angle();
-    info!("Angle: {}", angle.to_degrees());
     let transform = Transform::from_translation(trigger.position).with_rotation(Quat::from_rotation_y(angle - PI / 2.0));
     spell.cast(commands, transform, spell_assets.as_ref());
     spellbook.cooldown.reset();

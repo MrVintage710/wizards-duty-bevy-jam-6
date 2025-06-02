@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 use avian3d::prelude::*;
-
 use crate::GameState;
 
-const ARENA_SIZE: f32 = 1000.0;
+pub mod beacon;
+
+const ARENA_SIZE: f32 = 500.0;
 
 //==============================================================================================
 //        ArenaPlugin

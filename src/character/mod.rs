@@ -136,7 +136,6 @@ fn cast_spell (
     let origin_2d = Vec2::new(shoot_origin.translation.x, shoot_origin.translation.z);
     let direction = (target_2d - origin_2d).normalize_or_zero();    gizmos.ray(shoot_origin.translation, Vec3::new(direction.x, 0.0, direction.y), Color::srgb(1.0, 0.0, 0.0));
     if spellbook.cooldown.finished() {
-        info!("{direction}");
         commands.trigger(CastSpell {
             position: shoot_origin.translation,
             direction,
