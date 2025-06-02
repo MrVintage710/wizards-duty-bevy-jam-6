@@ -5635,6 +5635,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e754da4c789296bd5c913ea75881c646a88ada21944e66113859ab5724eb49e1"
 dependencies = [
+ "avian3d",
  "bevy",
  "itertools 0.13.0",
  "log",

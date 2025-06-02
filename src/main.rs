@@ -1,4 +1,4 @@
-use arena::ArenaPlugin;
+use arena::{ArenaPlugin, Obstacle};
 use assets::{AssetLoadingPlugin, WizardAssets};
 use bevy::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
@@ -10,6 +10,7 @@ use character::PlayerCharacterPlugin;
 use render::{pixelate::PixelationEffect, RenderPhase};
 use spells::SpellPlugin;
 use avian3d::prelude::*;
+use vleue_navigator::prelude::*;
 
 pub mod render;
 pub mod arena;
@@ -46,7 +47,10 @@ fn main() -> AppExit {
         .add_plugins(PhysicsPlugins::default())
         .add_plugins((TnuaControllerPlugin::new(FixedUpdate), TnuaAvian3dPlugin::new(FixedUpdate)))
         
-        //
+        .add_plugins(VleueNavigatorPlugin)
+        .add_plugins(NavmeshUpdaterPlugin::<Collider, Obstacle>::default())
+        
+        //This is where all of the assets are loaded
         .add_plugins(AssetLoadingPlugin)
         
         // Plugin that gives the pixelation effect to the camera
@@ -73,7 +77,7 @@ fn main() -> AppExit {
         app
             .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
             .add_plugins(WorldInspectorPlugin::new())
-            .add_plugins(PhysicsDebugPlugin::default())
+            // .add_plugins(PhysicsDebugPlugin::default())
             .insert_gizmo_config(PhysicsGizmos::default(), GizmoConfig::default())
         ;
     }
@@ -86,24 +90,23 @@ fn setup(
     mut commands: Commands,
     wizards_assets: Res<WizardAssets>,
 ) {
-        
-        let directional_light = DirectionalLight {
-            color: Color::Srgba(Srgba::rgba_u8(138, 135, 245, 255)),
-            shadows_enabled: true,
-            ..Default::default()
-        };
-        
-        // light
-        commands.spawn((
-            directional_light,
-            Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 5.5, 1.0, 0.0))
-        ));
-        
-        commands.spawn((
-            Name::new("Spellbook"),
-            Transform::from_xyz(0.0, 2.5, 0.0),
-            SceneRoot(wizards_assets.closed.clone())
-        ));
+    let directional_light = DirectionalLight {
+        color: Color::Srgba(Srgba::rgba_u8(138, 135, 245, 255)),
+        shadows_enabled: true,
+        ..Default::default()
+    };
+    
+    // light
+    commands.spawn((
+        directional_light,
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 5.5, 1.0, 0.0))
+    ));
+    
+    commands.spawn((
+        Name::new("Spellbook"),
+        Transform::from_xyz(0.0, 2.5, 0.0),
+        SceneRoot(wizards_assets.closed.clone())
+    ));
 }
 
 
