@@ -1,4 +1,4 @@
-use crate::{assets::SpellAssets, enemy::Enemy, spells::{on_spell_collision, SpellDamage}, util::GameCollisionLayer};
+use crate::{assets::SpellAssets, enemy::Enemy, spells::{on_spell_collision, DestroyOnSpellDamage, SpellDamage}, util::GameCollisionLayer};
 
 use super::Spell;
 use avian3d::prelude::{Collider, CollisionEventsEnabled, CollisionLayers, CollisionStarted, OnCollisionStart, RigidBody, Sensor};
@@ -42,6 +42,7 @@ impl Spell for PhantomBlade {
                     CollisionEventsEnabled,
                     Observer::new(on_spell_collision),
                     SpellDamage(PHANTOM_BLADE_DAMAGE),
+                    DestroyOnSpellDamage,
                     CollisionLayers::new(GameCollisionLayer::Spell, GameCollisionLayer::Enemy),
                     children![
                         (
