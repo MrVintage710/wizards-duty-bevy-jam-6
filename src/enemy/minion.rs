@@ -75,7 +75,7 @@ fn while_attacking_beacon(
 ) {
     let current_location = Vec2::new(transform.translation.x, transform.translation.z);
     if let None = current_path {
-        let path = navmesh.path(current_location, (0.0, 0.0).into());
+        let path = navmesh.path(current_location, (2.5, 2.5).into());
         *current_path = path;
     }
     

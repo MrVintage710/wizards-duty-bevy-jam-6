@@ -68,7 +68,7 @@ const AIM_HEIGHT: f32 = 1.0;
 pub struct Move;
 
 #[derive(Debug, InputAction)]
-#[input_action(output = f32)]
+#[input_action(output = Vec2)]
 pub struct Zoom;
 
 #[derive(Debug, InputAction)]
@@ -111,6 +111,7 @@ fn move_character(
     controller.basis(TnuaBuiltinWalk {
         desired_velocity: move_vector,
         float_height: 1.0,
+        max_slope: 45.0_f32.to_radians(),
         ..default()
     });
 }
@@ -121,7 +122,7 @@ fn zoom_cam(
     time : Res<Time>
 ) {
     let value = trigger.value;
-    camera_focus.zoom = (camera_focus.zoom + value * 0.2 * time.delta_secs()).clamp(0.0, 1.0);
+    camera_focus.zoom = (camera_focus.zoom + value.y * 0.2 * time.delta_secs()).clamp(0.0, 1.0);
 }
 
 fn cast_spell (
@@ -154,7 +155,7 @@ pub fn setup_player(
 ) {
     commands.spawn((
         ShootOrigin, 
-        Transform::from_translation(Vec3::new(0.0, AIM_HEIGHT, 0.0)), 
+        Transform::from_translation(Vec3::new(-2.5, AIM_HEIGHT, 0.0)), 
         CameraTarget,
         RigidBody::Dynamic,
         Collider::capsule(0.5, 0.5),

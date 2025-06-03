@@ -1,6 +1,6 @@
 use arena::{ArenaPlugin, Obstacle};
 use assets::{AssetLoadingPlugin, WizardAssets};
-use bevy::prelude::*;
+use bevy::{app::MainScheduleOrder, prelude::*};
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 use bevy_tnua::prelude::*;
@@ -12,6 +12,8 @@ use render::{pixelate::PixelationEffect, RenderPhase};
 use spells::SpellPlugin;
 use avian3d::prelude::*;
 use vleue_navigator::prelude::*;
+
+use crate::util::{set_default_animation_after_load, DefaultAnimationGraphMap, DefaultSceneAnimationPlugin, GameInit, PostGameInit};
 
 pub mod render;
 pub mod arena;
@@ -72,10 +74,14 @@ fn main() -> AppExit {
         //This is where all of the enemy logic is.
         .add_plugins(EnemyPlugin)
         
+        //This plugin is a helper that will set the default animation for a scene after it is loaded.
+        .add_plugins(DefaultSceneAnimationPlugin)
+        
         .add_systems(OnEnter(GameState::InGame), setup)
         
         .init_state::<GameState>()
     ;
+
     
     // All plugins that are only used in non release builds
     if cfg!(debug_assertions) {
@@ -86,6 +92,8 @@ fn main() -> AppExit {
             .insert_gizmo_config(PhysicsGizmos::default(), GizmoConfig::default())
         ;
     }
+    
+    app.configure_sets(OnEnter(GameState::InGame), (GameInit, PostGameInit).chain());
     
     app.run()
 }
@@ -105,12 +113,6 @@ fn setup(
     commands.spawn((
         directional_light,
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 5.5, 1.0, 0.0))
-    ));
-    
-    commands.spawn((
-        Name::new("Spellbook"),
-        Transform::from_xyz(0.0, 2.5, 0.0),
-        SceneRoot(wizards_assets.closed.clone())
     ));
     
     commands.trigger(SpawnEnemiesEventBuilder::new((25.0, 0.0, 25.0).into()).with_weight(EnemyType::Minion, 1).build());

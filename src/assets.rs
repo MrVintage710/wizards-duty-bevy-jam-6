@@ -17,6 +17,7 @@ impl Plugin for AssetLoadingPlugin {
                 .load_collection::<WizardAssets>()
                 .load_collection::<SpellAssets>()
                 .load_collection::<EnemyAssets>()
+                .load_collection::<BeaconAssets>()
         );
     }
 }
@@ -59,4 +60,16 @@ pub struct EnemyAssets {
     pub skeleton_minion: Handle<Scene>,
     #[asset(path = "models/enemy/Skeleton_Mage.glb#Scene0")]
     pub skeleton_mage: Handle<Scene>,
+}
+
+//==============================================================================================
+//        Beacon Assets
+//==============================================================================================
+
+#[derive(AssetCollection, Resource)]
+pub struct BeaconAssets {
+    #[asset(path = "models/beacon/beacon.glb#Scene0")]
+    pub beacon: Handle<Scene>,
+    #[asset(path = "models/beacon/beacon.glb#Animation0")]
+    pub animation: Handle<AnimationClip>,
 }

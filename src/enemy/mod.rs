@@ -23,7 +23,10 @@ impl Plugin for EnemyPlugin {
             
             .add_observer(spawn_enemy)
         
-            .add_systems(Update, (minion_behavior, debug_paths).chain())
+            .add_systems(Update, (
+                minion_behavior, 
+                debug_paths
+            ).chain())
             .add_systems(PostUpdate, check_for_dead_enemies)
         ;
     }
