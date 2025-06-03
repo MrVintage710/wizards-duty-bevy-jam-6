@@ -66,8 +66,8 @@ pub fn build_arena(
             ]),
             build_timeout: Some(1.0),
             simplify: 0.005,
-            merge_steps: 0,
-            agent_radius : 0.4,
+            merge_steps: 1,
+            agent_radius : 0.6,
             ..default()
         },
         NavMeshDebug(palettes::tailwind::RED_800.into()),

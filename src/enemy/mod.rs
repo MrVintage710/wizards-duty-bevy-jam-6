@@ -4,7 +4,7 @@ use strum::{EnumCount, FromRepr};
 use vleue_navigator::Path;
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::assets::EnemyAssets;
+use crate::{assets::EnemyAssets, enemy};
 
 pub mod minion;
 
@@ -24,8 +24,18 @@ impl Plugin for EnemyPlugin {
             .add_observer(spawn_enemy)
         
             .add_systems(Update, (minion_behavior, debug_paths).chain())
+            .add_systems(PostUpdate, check_for_dead_enemies)
         ;
     }
+}
+
+//==============================================================================================
+//        Enemy Component
+//==============================================================================================
+
+#[derive(Component)]
+pub struct Enemy {
+    pub health : i32,
 }
 
 //==============================================================================================
@@ -121,6 +131,23 @@ pub fn spawn_enemy(
     }
 }
 
+//==============================================================================================
+//        Enemy Systems
+//==============================================================================================
+
+pub fn check_for_dead_enemies (
+    mut commands : Commands,
+    enemies : Query<(Entity, &Enemy)>,
+    mut enemy_count : ResMut<EnemyCount>
+) {
+    for (entity, enemy) in enemies.iter() {
+        if enemy.health <= 0 {
+            enemy_count.0 -= 1;
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
 pub fn debug_paths (
     enemy_behaviors : Query<(&EnemyBehavior, &Transform)>,
     mut gizmos : Gizmos
@@ -128,9 +155,11 @@ pub fn debug_paths (
     for (enemy_behavior, transform) in enemy_behaviors.iter() {
         if let EnemyBehavior::AttackBeacon(Some(path), index) = enemy_behavior {
             let mut points : Vec<Vec3> = vec![(transform.translation.x, 0.1, transform.translation.z).into()];
-            path.path.iter().for_each(|point| points.push(Vec3::new(point.x, 0.1, point.y)));
+            path.path.iter().skip(*index).for_each(|point| points.push(Vec3::new(point.x, 0.1, point.y)));
             if let Some(point) = points.get(*index + 1) {
                 gizmos.sphere(Isometry3d::from_translation(*point), 0.3, bevy::color::palettes::tailwind::EMERALD_600);
+            } else {
+                gizmos.sphere(Isometry3d::from_translation(Vec3::new(0.0, 0.1, 0.0)), 0.3, bevy::color::palettes::tailwind::EMERALD_600);
             }
             gizmos.linestrip(points, bevy::color::palettes::tailwind::EMERALD_600);
         }

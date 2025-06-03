@@ -82,7 +82,7 @@ fn main() -> AppExit {
         app
             .add_plugins(EguiPlugin { enable_multipass_for_primary_context: true })
             .add_plugins(WorldInspectorPlugin::new())
-            // .add_plugins(PhysicsDebugPlugin::default())
+            .add_plugins(PhysicsDebugPlugin::default())
             .insert_gizmo_config(PhysicsGizmos::default(), GizmoConfig::default())
         ;
     }

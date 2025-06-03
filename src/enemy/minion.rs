@@ -1,28 +1,29 @@
-
-use std::path;
-
 use avian3d::prelude::*;
 use bevy::prelude::*;
 use bevy_tnua::prelude::*;
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use vleue_navigator::{prelude::*, Path};
-use crate::{arena::{Ground, ARENA_SIZE}, assets::EnemyAssets};
+use crate::{assets::EnemyAssets, enemy::Enemy, util::GameCollisionLayer};
 
 use super::EnemyBehavior;
 
 const MINION_HEIGHT: f32 = 1.0;
+const MINION_HEALTH: i32 = 5;
 
 //==============================================================================================
 //        Spawn a minion Enemy
 //==============================================================================================
-
 
 pub fn spawn_minion_enemy(commands : &mut Commands, position : Vec3, enemy_assets : &EnemyAssets) {
     
     commands.spawn((
         Transform::from_translation(Vec3::new(position.x, MINION_HEIGHT, position.z)),
         Minion,
+        Enemy {
+            health: MINION_HEALTH,
+        },
         EnemyBehavior::attack_beacon(),
+        CollisionLayers::new(GameCollisionLayer::Enemy, [GameCollisionLayer::Player, GameCollisionLayer::Default, GameCollisionLayer::Spell]),
         RigidBody::Dynamic,
         Collider::capsule(0.5, 0.5),
         TnuaController::default(),
@@ -89,10 +90,10 @@ fn while_attacking_beacon(
     }
     
     let direction_to_next = (current_node - current_location).normalize_or_zero();
-    let move_2d = direction_to_next;
+    let move_2d = direction_to_next * 4.0;
     controller.basis(TnuaBuiltinWalk {
         desired_velocity: (move_2d.x, 0.0, move_2d.y).into(),
-        float_height: 1.0,
+        float_height: MINION_HEIGHT,
         ..default()
     });
 }

@@ -1,10 +1,10 @@
 use std::{f32::consts::PI, marker::PhantomData};
 
-use avian3d::{position, sync};
+use avian3d::{position, prelude::OnCollisionStart, sync};
 use bevy::{prelude::*, render::render_resource::ShaderSize};
 use phantom_blade::{phantom_blade_spell_effect, PhantomBlade, PHANTOM_BLADE_COOLDOWN};
 
-use crate::assets::SpellAssets;
+use crate::{assets::SpellAssets, enemy::Enemy};
 
 pub mod phantom_blade;
 
@@ -32,7 +32,19 @@ impl Plugin for SpellPlugin {
 //==============================================================================================
 
 #[derive(Component)]
-struct SpellDamage(u32);
+pub struct SpellDamage(u32);
+
+pub fn on_spell_collision(
+    trigger : Trigger<OnCollisionStart>,
+    mut enemies : Query<&mut Enemy>,
+    spells : Query<&SpellDamage>
+) -> Result<(), BevyError> {
+    let spell = spells.get(trigger.target())?;
+    let mut enemy = enemies.get_mut(trigger.collider)?;
+    
+    enemy.health -= spell.0 as i32;
+    Ok(())
+}
 
 //==============================================================================================
 //        WeaponComponent

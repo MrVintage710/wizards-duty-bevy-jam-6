@@ -12,6 +12,6 @@ pub enum GameCollisionLayer {
     Default,
     Player,
     Enemy,
-    Projectile,
-    Wall,
+    Spell,
+    Obstacle
 }

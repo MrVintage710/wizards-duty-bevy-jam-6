@@ -1,10 +1,25 @@
-use crate::assets::SpellAssets;
+use crate::{assets::SpellAssets, enemy::Enemy, spells::{on_spell_collision, SpellDamage}, util::GameCollisionLayer};
 
 use super::Spell;
-use avian3d::prelude::{Collider, Sensor};
+use avian3d::prelude::{Collider, CollisionEventsEnabled, CollisionLayers, CollisionStarted, OnCollisionStart, RigidBody, Sensor};
 use bevy::{prelude::*, transform};
 
 pub const PHANTOM_BLADE_COOLDOWN: f32 = 0.3;
+pub const PHANTOM_BLADE_DAMAGE: u32 = 3;
+
+//==============================================================================================
+//        Phantom Blade PLguin
+//==============================================================================================
+
+pub struct PhantomBladePlugin;
+
+impl Plugin for PhantomBladePlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .add_systems(Update, phantom_blade_spell_effect)
+        ;
+    }
+}
 
 //==============================================================================================
 //        Phantom Blade Spell
@@ -24,6 +39,10 @@ impl Spell for PhantomBlade {
                     Sensor,
                     Collider::cylinder(0.1, 1.0),
                     InheritedVisibility::default(),
+                    CollisionEventsEnabled,
+                    Observer::new(on_spell_collision),
+                    SpellDamage(PHANTOM_BLADE_DAMAGE),
+                    CollisionLayers::new(GameCollisionLayer::Spell, GameCollisionLayer::Enemy),
                     children![
                         (
                             Transform::from_translation(Vec3::new(0.0, -0.5, 0.0)),
@@ -69,5 +88,4 @@ pub fn phantom_blade_spell_effect(
         }
     }
 }
-
 
