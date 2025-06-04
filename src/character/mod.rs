@@ -1,3 +1,5 @@
+use std::f64::consts::PI;
+
 use aim::{AimPlugin, ShootTarget};
 use avian3d::{dynamics::rigid_body, prelude::{Collider, Friction, LinearVelocity, LockedAxes, RigidBody}};
 use bevy::{input::mouse::MouseWheel, math::VectorSpace, prelude::*};
@@ -8,6 +10,9 @@ use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use crate::{assets::WizardAssets, camera::{CameraFocus, CameraTarget}, spells::{CastSpell, Spellbook}, GameState};
 
 pub mod aim;
+
+pub const PLAYER_HEALTH: f32 = 100.0;
+pub const PLAYER_SPEED: f32 = 4.0;
 
 //==============================================================================================
 //        PlayerCharacterPlugin
@@ -43,6 +48,7 @@ pub struct ShootOrigin;
 #[derive(Component)]
 #[require(Transform)]
 pub struct PlayerCharacter {
+    health: f32,
     speed: f32,
 }
 
@@ -52,7 +58,8 @@ pub struct PlayerModelRoot;
 impl Default for PlayerCharacter {
     fn default() -> Self {
         PlayerCharacter {
-            speed: 4.0,
+            health: PLAYER_HEALTH,
+            speed: PLAYER_SPEED,
         }
     }
 }
@@ -95,6 +102,7 @@ pub fn bind_actions(
 fn move_character(
     query : Single<(&mut TnuaController, &Actions<OnFoot>, &PlayerCharacter)>,
     cam_focus : Single<&CameraFocus>,
+    mut forward_vec : Local<Vec3>
 ) {
     let (mut controller, actions, player_character) = query.into_inner();
     
@@ -105,13 +113,19 @@ fn move_character(
         let move_value = Vec3::new(in_move.x, 0.0, -in_move.y).normalize_or_zero();
         let rotation = Quat::from_euler(EulerRot::XYZ, 0.0, cam_focus.rotation.to_radians(), 0.0);
         let rotated_move = rotation.mul_vec3(move_value);
+        *forward_vec = rotated_move;
         move_vector = rotated_move * player_character.speed;
+    }
+    
+    if *forward_vec == Vec3::default() {
+        *forward_vec = Vec3::new(0.0, 0.0, -1.0);
     }
     
     controller.basis(TnuaBuiltinWalk {
         desired_velocity: move_vector,
         float_height: 1.0,
         max_slope: 45.0_f32.to_radians(),
+        desired_forward : Some(Dir3::from_xyz_unchecked(forward_vec.x, forward_vec.y, forward_vec.z)),
         ..default()
     });
 }
@@ -166,12 +180,9 @@ pub fn setup_player(
         TnuaController::default(),
         // A sensor shape is not strictly necessary, but without it we'll get weird results.
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
-        // Tnua can fix the rotation, but the character will still get rotated before it can do so.
-        // By locking the rotation we can prevent this.
-        LockedAxes::ROTATION_LOCKED,
         children![
             (
-                Transform::from_xyz(0.0, -AIM_HEIGHT, 0.0),
+                Transform::from_xyz(0.0, -AIM_HEIGHT, 0.0).with_rotation(Quat::from_rotation_y(PI as f32)),
                 SceneRoot(wizards_assets.wizard.clone()),
                 PlayerModelRoot
             )

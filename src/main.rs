@@ -1,6 +1,6 @@
 use arena::{ArenaPlugin, Obstacle};
 use assets::{AssetLoadingPlugin, WizardAssets};
-use bevy::{app::MainScheduleOrder, prelude::*};
+use bevy::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 use bevy_tnua::prelude::*;
@@ -13,7 +13,7 @@ use spells::SpellPlugin;
 use avian3d::prelude::*;
 use vleue_navigator::prelude::*;
 
-use crate::util::{set_default_animation_after_load, DefaultAnimationGraphMap, DefaultSceneAnimationPlugin, GameInit, PostGameInit};
+use crate::{enemy::{DefaultEnemyBehavior, SpecialEnemyBehavior}, util::{DefaultSceneAnimationPlugin, GameInit, PostGameInit}};
 
 pub mod render;
 pub mod arena;
@@ -72,7 +72,7 @@ fn main() -> AppExit {
         .add_plugins(SpellPlugin)
         
         //This is where all of the enemy logic is.
-        .add_plugins(EnemyPlugin)
+        .add_plugins(EnemyPlugin::new(cfg!(debug_assertions)))
         
         //This plugin is a helper that will set the default animation for a scene after it is loaded.
         .add_plugins(DefaultSceneAnimationPlugin)
@@ -94,6 +94,7 @@ fn main() -> AppExit {
     }
     
     app.configure_sets(OnEnter(GameState::InGame), (GameInit, PostGameInit).chain());
+    app.configure_sets(Update, (DefaultEnemyBehavior, SpecialEnemyBehavior).chain().run_if(in_state(GameState::InGame)));
     
     app.run()
 }
@@ -101,7 +102,6 @@ fn main() -> AppExit {
 /// set up a simple 3D scene
 fn setup(
     mut commands: Commands,
-    wizards_assets: Res<WizardAssets>,
 ) {
     let directional_light = DirectionalLight {
         color: Color::Srgba(Srgba::rgba_u8(138, 135, 245, 255)),

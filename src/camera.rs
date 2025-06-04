@@ -97,7 +97,7 @@ pub fn spawn_camera(
                     scaling_mode: bevy::render::camera::ScalingMode::FixedVertical { viewport_height: 6.0 },
                     ..OrthographicProjection::default_3d()
                 }),
-                PixelationEffect::default(),
+                // PixelationEffect::default(),
                 camera_transform,
                 MainCamera,
             )

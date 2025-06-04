@@ -1,10 +1,12 @@
+use avian3d::position;
 use bevy::prelude::*;
-use minion::{minion_behavior, spawn_minion_enemy};
+use bevy_tnua::prelude::*;
+use minion::{spawn_minion_enemy};
 use strum::{EnumCount, FromRepr};
-use vleue_navigator::Path;
+use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshStatus}, NavMesh, Path};
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::{assets::EnemyAssets, enemy};
+use crate::{arena::Ground, assets::EnemyAssets, enemy::{self, minion::MinionPlugin}};
 
 pub mod minion;
 
@@ -14,21 +16,36 @@ const MAX_ENEMIES: u32 = 1000;
 //        Enemy Plguin
 //==============================================================================================
 
-pub struct EnemyPlugin;
+pub struct EnemyPlugin(bool);
+
+impl Default for EnemyPlugin {
+    fn default() -> Self {
+        EnemyPlugin(false)
+    }
+}
+
+impl EnemyPlugin {
+    pub fn new(debug: bool) -> Self {
+        EnemyPlugin(debug)
+    }
+}
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_plugins(MinionPlugin)
+            
             .init_resource::<EnemyCount>()
             
-            .add_observer(spawn_enemy)
+            .add_observer(spawn_enemies)
         
-            .add_systems(Update, (
-                minion_behavior, 
-                debug_paths
-            ).chain())
+            .add_systems(Update, (enemy_goto).in_set(DefaultEnemyBehavior))
             .add_systems(PostUpdate, check_for_dead_enemies)
         ;
+        
+        if self.0 {
+            app.add_systems(Update, debug_goto.in_set(DefaultEnemyBehavior));
+        }
     }
 }
 
@@ -39,6 +56,8 @@ impl Plugin for EnemyPlugin {
 #[derive(Component)]
 pub struct Enemy {
     pub health : i32,
+    pub height_from_ground : f32,
+    pub speed : f32,
 }
 
 //==============================================================================================
@@ -59,11 +78,18 @@ pub enum EnemyType {
 //        Enemy Behaviors
 //==============================================================================================
 
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DefaultEnemyBehavior;
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SpecialEnemyBehavior;
+
 #[derive(Component, Default, Debug)]
 pub enum EnemyBehavior {
     #[default]
     None,
     Guard,
+    Goto(Vec2, Option<Path>, usize),
     AttackBeacon(Option<Path>, usize),
     AttackPlayer,
 }
@@ -71,6 +97,18 @@ pub enum EnemyBehavior {
 impl EnemyBehavior {
     pub fn attack_beacon() -> Self {
         EnemyBehavior::AttackBeacon(None, 0)
+    }
+    
+    pub fn goto(position : Vec2) -> Self {
+        EnemyBehavior::Goto(position, None, 0)
+    }
+    
+    pub fn is_goto(&self) -> bool {
+        matches!(self, EnemyBehavior::Goto(..))
+    }
+    
+    pub fn is_attack_player(&self) -> bool {
+        matches!(self, EnemyBehavior::AttackPlayer)
     }
 }
 
@@ -117,19 +155,18 @@ impl SpawnEnemiesEventBuilder {
     }
 }
 
-pub fn spawn_enemy(
+#[derive(Event)]
+pub struct SpawnEnemy(Vec3, EnemyType);
+
+pub fn spawn_enemies(
     trigger : Trigger<SpawnEnemiesEvent>,
     mut commands : Commands,
-    mut enemy_count: ResMut<EnemyCount>,
-    enemy_assets : Res<EnemyAssets>,
+    mut enemy_count: ResMut<EnemyCount>
 ) {
     if enemy_count.0 > MAX_ENEMIES { return }
     
     for enemy in trigger.collect().into_iter() {
-        match enemy {
-            EnemyType::Minion => spawn_minion_enemy(&mut commands, trigger.0, enemy_assets.as_ref()),
-            EnemyType::Mage => todo!(),
-        }
+        commands.trigger(SpawnEnemy(trigger.0, enemy));
         enemy_count.0 += 1;
     }
 }
@@ -151,18 +188,56 @@ pub fn check_for_dead_enemies (
     }
 }
 
-pub fn debug_paths (
+//==============================================================================================
+//        Enemy Goto
+//==============================================================================================
+
+pub fn enemy_goto(
+    mut enemy : Query<(&Transform, &mut TnuaController, &mut EnemyBehavior, &Enemy)>,
+    navmesh : Single<(&ManagedNavMesh, &NavMeshStatus)>,
+    navmeshes : Res<Assets<NavMesh>>
+) {
+    if *navmesh.1 != NavMeshStatus::Built { return };
+    let Some(navmesh) = navmeshes.get(navmesh.0.id()) else { return };
+    
+    for (transform, mut controller, mut behavior, enemy) in enemy.iter_mut() {
+        let EnemyBehavior::Goto(destination, current_path, index) = behavior.as_mut() else { continue; };
+        let current_location = Vec2::new(transform.translation.x, transform.translation.z);
+        if let None = current_path {
+            let path = navmesh.path(current_location, *destination);
+            *current_path = path;
+        }
+        
+        let current_path = current_path.as_ref().unwrap();
+        let current_node = current_path.path.get(*index).unwrap_or(destination);
+        
+        let direction_to_next = (current_node - current_location).normalize_or_zero();
+        let move_2d = direction_to_next * enemy.speed;
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: (move_2d.x, 0.0, move_2d.y).into(),
+            float_height: enemy.height_from_ground,
+            desired_forward: Some(Dir3::from_xyz_unchecked(direction_to_next.x, 0.0, direction_to_next.y)),
+            ..default()
+        });
+        
+        if current_location.distance(*current_node) < 0.3 && *index < current_path.path.len() {
+            *index += 1;
+        }
+    }
+}
+
+pub fn debug_goto (
     enemy_behaviors : Query<(&EnemyBehavior, &Transform)>,
     mut gizmos : Gizmos
 ) {
     for (enemy_behavior, transform) in enemy_behaviors.iter() {
-        if let EnemyBehavior::AttackBeacon(Some(path), index) = enemy_behavior {
+        if let EnemyBehavior::Goto(destination, Some(path), index) = enemy_behavior {
             let mut points : Vec<Vec3> = vec![(transform.translation.x, 0.1, transform.translation.z).into()];
             path.path.iter().skip(*index).for_each(|point| points.push(Vec3::new(point.x, 0.1, point.y)));
             if let Some(point) = points.get(*index + 1) {
                 gizmos.sphere(Isometry3d::from_translation(*point), 0.3, bevy::color::palettes::tailwind::EMERALD_600);
             } else {
-                gizmos.sphere(Isometry3d::from_translation(Vec3::new(0.0, 0.1, 0.0)), 0.3, bevy::color::palettes::tailwind::EMERALD_600);
+                gizmos.sphere(Isometry3d::from_translation(Vec3::new(destination.x, 0.1, destination.y)), 0.3, bevy::color::palettes::tailwind::EMERALD_600);
             }
             gizmos.linestrip(points, bevy::color::palettes::tailwind::EMERALD_600);
         }

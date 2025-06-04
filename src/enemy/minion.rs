@@ -1,37 +1,82 @@
+use std::f64::consts::PI;
+
 use avian3d::prelude::*;
-use bevy::prelude::*;
+use bevy::{prelude::*, transform};
 use bevy_tnua::prelude::*;
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
-use vleue_navigator::{prelude::*, Path};
-use crate::{assets::EnemyAssets, enemy::Enemy, util::GameCollisionLayer};
+use crate::{assets::EnemyAssets, character::PlayerCharacter, enemy::{minion, Enemy, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::GameCollisionLayer};
 
 use super::EnemyBehavior;
 
 const MINION_HEIGHT: f32 = 1.0;
 const MINION_HEALTH: i32 = 5;
+const MINION_SPEED: f32 = 3.0;
+const MINION_AGRO_RANGE: f32 = 10.0;
+const MINION_ATTACK_COOLDOWN: f32 = 2.0;
+const MINION_ATTACK_RANGE: f32 = 1.5;
+
+//==============================================================================================
+//        Minion Plugin
+//==============================================================================================
+
+pub struct MinionPlugin;
+
+impl Plugin for MinionPlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .add_observer(spawn_minion_enemy)
+            .add_systems(Update, (minion_goto, minion_attack_player).in_set(SpecialEnemyBehavior))
+        ;
+    }
+}
+
+//==============================================================================================
+//        Minion Component
+//==============================================================================================
+
+#[derive(Component)]
+pub struct Minion {
+    pub attack_cooldown: Timer,
+}
+
+impl Default for Minion {
+    fn default() -> Self {
+        Self {
+            attack_cooldown: Timer::from_seconds(MINION_ATTACK_COOLDOWN, TimerMode::Repeating),
+        }
+    }
+}
+
 
 //==============================================================================================
 //        Spawn a minion Enemy
 //==============================================================================================
 
-pub fn spawn_minion_enemy(commands : &mut Commands, position : Vec3, enemy_assets : &EnemyAssets) {
+pub fn spawn_minion_enemy(
+    trigger : Trigger<SpawnEnemy>,
+    mut commands : Commands,
+    enemy_assets : Res<EnemyAssets>
+) {
+    if trigger.1 != EnemyType::Minion { return }
+    let position = trigger.0;
     
     commands.spawn((
         Transform::from_translation(Vec3::new(position.x, MINION_HEIGHT, position.z)),
-        Minion,
+        Minion::default(),
         Enemy {
             health: MINION_HEALTH,
+            height_from_ground: MINION_HEIGHT,
+            speed: MINION_SPEED,
         },
-        EnemyBehavior::attack_beacon(),
+        EnemyBehavior::goto((-2.5, -2.5).into()),
         CollisionLayers::new(GameCollisionLayer::Enemy, [GameCollisionLayer::Player, GameCollisionLayer::Default, GameCollisionLayer::Spell]),
         RigidBody::Dynamic,
         Collider::capsule(0.5, 0.5),
         TnuaController::default(),
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
-        LockedAxes::ROTATION_LOCKED,
         children![
             (
-                Transform::from_translation((0.0, -1.0, 0.0).into()),
+                Transform::from_translation((0.0, -1.0, 0.0).into()).with_rotation(Quat::from_rotation_y(PI as f32)),
                 SceneRoot(enemy_assets.skeleton_minion.clone())
             )
         ]
@@ -43,57 +88,67 @@ pub fn spawn_minion_enemy(commands : &mut Commands, position : Vec3, enemy_asset
 //        Minion Logic
 //==============================================================================================
 
-#[derive(Component)]
-pub struct Minion;
 
-pub fn minion_behavior(
-    mut minion : Query<(&mut EnemyBehavior, &mut TnuaController, &Transform), With<Minion>>,
-    ground : Single<(&ManagedNavMesh, &NavMeshStatus)>,
-    nav_meshes : Res<Assets<NavMesh>>
+pub fn minion_goto (
+    player : Single<&Transform, With<PlayerCharacter>>,
+    mut minions : Query<&mut EnemyBehavior, With<Minion>>,
+    spacial_query: SpatialQuery,
 ) {
-    if *ground.1 != NavMeshStatus::Built { return }
-    let Some(navmesh) = nav_meshes.get(ground.0.id()) else { return };
+    let entities = spacial_query.shape_intersections(
+        &Collider::sphere(MINION_AGRO_RANGE),
+        player.translation, 
+        Quat::default(),                 // Shape rotation
+        &SpatialQueryFilter::default()
+    );
     
-    for (mut enemy_behavior, mut controller, transform) in minion.iter_mut() {
-        match enemy_behavior.as_mut() {
-            EnemyBehavior::None => return,
-            EnemyBehavior::Guard => todo!(),
-            EnemyBehavior::AttackBeacon(path, index) => {
-                while_attacking_beacon(controller.as_mut(), path, index, navmesh, transform);
-            },
-            EnemyBehavior::AttackPlayer => todo!(),
-        }
+    for entity in entities.iter() {
+        let Ok(mut behavior) = minions.get_mut(*entity) else { continue; };
+        if !behavior.is_goto() {continue;}
+        *behavior = EnemyBehavior::AttackPlayer;
     }
 }
 
-fn while_attacking_beacon(
-    controller : &mut TnuaController,
-    current_path : &mut Option<Path>,
-    index : &mut usize,
-    navmesh : &NavMesh,
-    transform : &Transform
+pub fn minion_attack_player(
+     player : Single<&Transform, With<PlayerCharacter>>,
+     mut minions : Query<(Entity, &mut EnemyBehavior, &mut TnuaController, &Transform, &mut Minion)>,
+     spacial_query : SpatialQuery,
+     time : Res<Time>
 ) {
-    let current_location = Vec2::new(transform.translation.x, transform.translation.z);
-    if let None = current_path {
-        let path = navmesh.path(current_location, (2.5, 2.5).into());
-        *current_path = path;
-    }
+    let enemies_within_agro_range = spacial_query.shape_intersections(
+        &Collider::sphere(MINION_AGRO_RANGE),
+        player.translation, 
+        Quat::default(),                 // Shape rotation
+        &SpatialQueryFilter::default()
+    );
     
-    let current_path = current_path.as_ref().unwrap();
-    let Some(mut current_node) = current_path.path.get(*index) else { return };
+    let enemies_within_attack_range = spacial_query.shape_intersections(
+        &Collider::sphere(MINION_ATTACK_RANGE),
+        player.translation, 
+        Quat::default(),                 // Shape rotation
+        &SpatialQueryFilter::default()
+    );
     
-    if current_location.distance(*current_node) < 0.3 {
-        *index += 1;
-        if let Some(next_node) = current_path.path.get(*index) {
-            current_node = next_node;
+    for (entity, mut behavior, mut controller, transform, mut minion) in minions.iter_mut() {
+        if !behavior.is_attack_player() {continue;}
+        
+        let direction_to_player = (player.translation.xz() - transform.translation.xz()).normalize_or_zero();
+        let move_vector = direction_to_player * MINION_SPEED;
+        
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: (move_vector.x, 0.0, move_vector.y).into(),
+            float_height: MINION_HEIGHT,
+            desired_forward: Some(Dir3::from_xyz_unchecked(direction_to_player.x, 0.0, direction_to_player.y)),
+            ..default()
+        });
+        
+        if !enemies_within_agro_range.contains(&entity) {
+            *behavior = EnemyBehavior::None;
         }
+        
+        if enemies_within_attack_range.contains(&entity) && minion.attack_cooldown.just_finished() {
+            println!("ATACK!");
+        }
+        
+        minion.attack_cooldown.tick(time.delta());
     }
-    
-    let direction_to_next = (current_node - current_location).normalize_or_zero();
-    let move_2d = direction_to_next * 4.0;
-    controller.basis(TnuaBuiltinWalk {
-        desired_velocity: (move_2d.x, 0.0, move_2d.y).into(),
-        float_height: MINION_HEIGHT,
-        ..default()
-    });
 }
