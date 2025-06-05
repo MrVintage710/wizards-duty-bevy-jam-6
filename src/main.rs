@@ -33,6 +33,7 @@ pub enum GameState {
     #[default]
     Loading,
     InGame,
+    GameOver,
 }
 
 //==============================================================================================
@@ -56,9 +57,6 @@ fn main() -> AppExit {
         //This is where all of the assets are loaded
         .add_plugins(AssetLoadingPlugin)
         
-        // Plugin that gives the pixelation effect to the camera
-        .add_plugins(PixelationEffect::plugin())
-        
         // Plugin for the Play area
         .add_plugins(ArenaPlugin)
         
@@ -81,6 +79,10 @@ fn main() -> AppExit {
         
         .init_state::<GameState>()
     ;
+    
+    if cfg!(feature="native") {
+        app.add_plugins(PixelationEffect::plugin());
+    }
 
     
     // All plugins that are only used in non release builds

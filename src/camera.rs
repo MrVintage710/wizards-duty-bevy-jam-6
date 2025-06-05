@@ -2,7 +2,7 @@
 use bevy::{pbr::Atmosphere, prelude::*, render::camera::ScalingMode};
 use bevy_inspector_egui::InspectorOptions;
 
-use crate::{render::pixelate::PixelationEffect};
+use crate::render::{pixelate::PixelationEffect};
 
 //==============================================================================================
 //        CameraPlugin
@@ -97,7 +97,8 @@ pub fn spawn_camera(
                     scaling_mode: bevy::render::camera::ScalingMode::FixedVertical { viewport_height: 6.0 },
                     ..OrthographicProjection::default_3d()
                 }),
-                // PixelationEffect::default(),
+                #[cfg(feature = "native")]
+                PixelationEffect::default(),
                 camera_transform,
                 MainCamera,
             )
