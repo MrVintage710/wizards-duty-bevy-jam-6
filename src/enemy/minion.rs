@@ -2,14 +2,15 @@ use std::f64::consts::PI;
 
 use avian3d::prelude::*;
 use bevy::{prelude::*, transform};
-use bevy_tnua::prelude::*;
+use bevy_seedling::sample::SamplePlayer;
+use bevy_tnua::{prelude::*, TnuaNotPlatform};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
-use crate::{assets::EnemyAssets, character::PlayerCharacter, enemy::{minion, Enemy, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::GameCollisionLayer};
+use crate::{assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{minion, Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
 
 use super::EnemyBehavior;
 
 const MINION_HEIGHT: f32 = 1.0;
-const MINION_HEALTH: i32 = 5;
+const MINION_HEALTH: u32 = 5;
 const MINION_SPEED: f32 = 3.0;
 const MINION_AGRO_RANGE: f32 = 10.0;
 const MINION_ATTACK_COOLDOWN: f32 = 2.0;
@@ -47,6 +48,19 @@ impl Default for Minion {
     }
 }
 
+//==============================================================================================
+//       Minion Events 
+//==============================================================================================
+
+#[derive(Event, Clone)]
+pub struct MinionStabbed;
+
+pub fn minion_stabbed(
+    events: Trigger<MinionStabbed>,
+    mut query: Query<&mut Minion>,
+) {
+    println!("Stabbed")
+}
 
 //==============================================================================================
 //        Spawn a minion Enemy
@@ -55,39 +69,57 @@ impl Default for Minion {
 pub fn spawn_minion_enemy(
     trigger : Trigger<SpawnEnemy>,
     mut commands : Commands,
-    enemy_assets : Res<EnemyAssets>
+    enemy_assets : Res<EnemyAssets>,
+    enemy_animation_graphs : Res<EnemyAnimationGraphs>
 ) {
     if trigger.1 != EnemyType::Minion { return }
     let position = trigger.0;
     
+    
     commands.spawn((
+        Name::new("Minion"),
         Transform::from_translation(Vec3::new(position.x, MINION_HEIGHT, position.z)),
         Minion::default(),
         Enemy {
-            health: MINION_HEALTH,
             height_from_ground: MINION_HEIGHT,
             speed: MINION_SPEED,
         },
-        EnemyBehavior::goto((-2.5, -2.5).into()),
+        Health::new(MINION_HEALTH),
+        EnemyBehavior::Spawning,
         CollisionLayers::new(GameCollisionLayer::Enemy, [GameCollisionLayer::Player, GameCollisionLayer::Default, GameCollisionLayer::Spell]),
         RigidBody::Dynamic,
         Collider::capsule(0.5, 0.5),
         TnuaController::default(),
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
-        children![
-            (
-                Transform::from_translation((0.0, -1.0, 0.0).into()).with_rotation(Quat::from_rotation_y(PI as f32)),
-                SceneRoot(enemy_assets.skeleton_minion.clone())
-            )
-        ]
-    ));
-    // Implementation details here
+        TnuaNotPlatform,
+        SceneRootWithAnimation::new(enemy_assets.skeleton_minion.clone(), enemy_animation_graphs.minion_graph.clone())
+            .with_animation(enemy_animation_graphs.minion_spawn)
+            .with_transform(Transform::from_translation((0.0, -1.0, 0.0).into()).with_rotation(Quat::from_rotation_y(PI as f32))),
+    )).observe(on_minion_scene_added);
+}
+
+pub fn on_minion_scene_added(
+    trigger : Trigger<AnimatedSceneCreated>,
+    named : Query<&Name>,
+    mut commands : Commands
+) {
+    let controler = trigger.target().clone();
+    println!("{:?}", named.get(controler));
+    commands.entity(trigger.0).observe(move |_ : Trigger<EnemySpawnAnimationComplete>, mut enemies : Query<&mut EnemyBehavior, With<Enemy>>| {
+        let Ok(mut enemy_behavior) = enemies.get_mut(controler) else { return; };
+        *enemy_behavior = EnemyBehavior::Idle;
+    });
 }
 
 //==============================================================================================
-//        Minion Logic
+//        Animating the Minion
 //==============================================================================================
 
+
+
+//==============================================================================================
+//        Minion Behavior
+//==============================================================================================
 
 pub fn minion_goto (
     player : Single<&Transform, With<PlayerCharacter>>,
@@ -109,10 +141,12 @@ pub fn minion_goto (
 }
 
 pub fn minion_attack_player(
-     player : Single<&Transform, With<PlayerCharacter>>,
-     mut minions : Query<(Entity, &mut EnemyBehavior, &mut TnuaController, &Transform, &mut Minion)>,
-     spacial_query : SpatialQuery,
-     time : Res<Time>
+    mut commmands : Commands,
+    player : Single<&Transform, With<PlayerCharacter>>,
+    player_assets : Res<WizardAssets>,
+    mut minions : Query<(Entity, &mut EnemyBehavior, &mut TnuaController, &Transform, &mut Minion)>,
+    spacial_query : SpatialQuery,
+    time : Res<Time>
 ) {
     let enemies_within_agro_range = spacial_query.shape_intersections(
         &Collider::sphere(MINION_AGRO_RANGE),
@@ -142,11 +176,13 @@ pub fn minion_attack_player(
         });
         
         if !enemies_within_agro_range.contains(&entity) {
-            *behavior = EnemyBehavior::None;
+            *behavior = EnemyBehavior::Idle;
         }
         
         if enemies_within_attack_range.contains(&entity) && minion.attack_cooldown.just_finished() {
-            println!("ATACK!");
+            commmands.spawn((
+                SamplePlayer::new(player_assets.oof1.clone())
+            ));
         }
         
         minion.attack_cooldown.tick(time.delta());

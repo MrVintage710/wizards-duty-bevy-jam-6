@@ -3,6 +3,7 @@ use assets::{AssetLoadingPlugin, WizardAssets};
 use bevy::prelude::*;
 use bevy_enhanced_input::EnhancedInputPlugin;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
+use bevy_seedling::SeedlingPlugin;
 use bevy_tnua::prelude::*;
 use bevy_tnua_avian3d::*;
 use camera::CameraPlugin;
@@ -50,6 +51,7 @@ fn main() -> AppExit {
         .add_plugins(EnhancedInputPlugin)
         .add_plugins(PhysicsPlugins::default())
         .add_plugins((TnuaControllerPlugin::new(FixedUpdate), TnuaAvian3dPlugin::new(FixedUpdate)))
+        .add_plugins(SeedlingPlugin::default())
         
         .add_plugins(VleueNavigatorPlugin)
         .add_plugins(NavmeshUpdaterPlugin::<Collider, Obstacle>::default())
@@ -117,7 +119,7 @@ fn setup(
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 5.5, 1.0, 0.0))
     ));
     
-    commands.trigger(SpawnEnemiesEventBuilder::new((25.0, 0.0, 25.0).into()).with_weight(EnemyType::Minion, 1).build());
+    commands.trigger(SpawnEnemiesEventBuilder::new((-5.0, 0.0, -5.0).into()).with_weight(EnemyType::Minion, 1).build());
 }
 
 

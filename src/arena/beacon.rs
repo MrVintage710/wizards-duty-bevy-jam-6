@@ -39,11 +39,9 @@ pub fn spawn_beacon(
         Collider::cuboid(1.0, 4.0, 1.0),
         RigidBody::Static,
         Transform::from_rotation(Quat::from_rotation_y(-45.0_f32.to_radians())),
-        SceneRootWithAnimation {
-            scene: assets.beacon.clone(),
-            animation_graph: graphs.add(graph),
-            animation: id,
-        }
+        SceneRootWithAnimation::new(assets.beacon.clone(), graphs.add(graph))
+            .with_animation(id)
+            .repeat()
     ));
 }
 

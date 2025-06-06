@@ -4,7 +4,7 @@ use aim::{AimPlugin, ShootTarget};
 use avian3d::{dynamics::rigid_body, prelude::{Collider, Friction, LinearVelocity, LockedAxes, RigidBody}};
 use bevy::{input::mouse::MouseWheel, math::VectorSpace, prelude::*};
 use bevy_enhanced_input::prelude::*;
-use bevy_tnua::{controller, prelude::{TnuaBuiltinWalk, TnuaController}};
+use bevy_tnua::{controller, prelude::{TnuaBuiltinWalk, TnuaController}, TnuaNotPlatform};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 
 use crate::{assets::WizardAssets, camera::{CameraFocus, CameraTarget}, spells::{CastSpell, Spellbook}, GameState};
@@ -176,7 +176,7 @@ pub fn setup_player(
         Actions::<OnFoot>::default(),
         PlayerCharacter::default(),
         Name::new("Player"),
-        
+        TnuaNotPlatform,
         TnuaController::default(),
         // A sensor shape is not strictly necessary, but without it we'll get weird results.
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),

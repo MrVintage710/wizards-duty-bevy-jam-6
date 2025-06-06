@@ -1,12 +1,12 @@
 use avian3d::position;
-use bevy::prelude::*;
+use bevy::{ecs::system::IntoObserverSystem, prelude::*};
 use bevy_tnua::prelude::*;
 use minion::{spawn_minion_enemy};
 use strum::{EnumCount, FromRepr};
 use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshStatus}, NavMesh, Path};
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::{arena::Ground, assets::EnemyAssets, enemy::{self, minion::MinionPlugin}};
+use crate::{arena::Ground, assets::EnemyAssets, enemy::{self, minion::MinionPlugin}, util::Health};
 
 pub mod minion;
 
@@ -39,7 +39,7 @@ impl Plugin for EnemyPlugin {
             
             .add_observer(spawn_enemies)
         
-            .add_systems(Update, (enemy_goto).in_set(DefaultEnemyBehavior))
+            .add_systems(Update, (enemy_goto, enemy_idle_and_spawning).in_set(DefaultEnemyBehavior))
             .add_systems(PostUpdate, check_for_dead_enemies)
         ;
         
@@ -55,7 +55,6 @@ impl Plugin for EnemyPlugin {
 
 #[derive(Component)]
 pub struct Enemy {
-    pub health : i32,
     pub height_from_ground : f32,
     pub speed : f32,
 }
@@ -87,7 +86,8 @@ pub struct SpecialEnemyBehavior;
 #[derive(Component, Default, Debug)]
 pub enum EnemyBehavior {
     #[default]
-    None,
+    Idle,
+    Spawning,
     Guard,
     Goto(Vec2, Option<Path>, usize),
     AttackBeacon(Option<Path>, usize),
@@ -115,6 +115,9 @@ impl EnemyBehavior {
 //==============================================================================================
 //         Spawn Enemy Event
 //==============================================================================================
+
+#[derive(Event, Clone)]
+pub struct EnemySpawnAnimationComplete;
 
 #[derive(Event)]
 pub struct SpawnEnemiesEvent(Vec3, u32, WalkerTable);
@@ -177,11 +180,11 @@ pub fn spawn_enemies(
 
 pub fn check_for_dead_enemies (
     mut commands : Commands,
-    enemies : Query<(Entity, &Enemy)>,
+    enemies : Query<(Entity, &Health), With<Enemy>>,
     mut enemy_count : ResMut<EnemyCount>
 ) {
     for (entity, enemy) in enemies.iter() {
-        if enemy.health <= 0 {
+        if enemy.current_health == 0 {
             enemy_count.0 -= 1;
             commands.entity(entity).despawn();
         }
@@ -244,3 +247,24 @@ pub fn debug_goto (
     }
 }
 
+//==============================================================================================
+//        Enemy Idle
+//==============================================================================================
+
+pub fn enemy_idle_and_spawning(
+    mut enemy : Query<(&mut TnuaController, &mut EnemyBehavior, &Enemy)>,
+) {
+    for (mut controller, mut behavior, enemy) in enemy.iter_mut() {
+        if !(matches!(behavior.as_ref(), &EnemyBehavior::Idle | &EnemyBehavior::Spawning)) {return;}
+        let EnemyBehavior::Idle = behavior.as_mut() else { continue; };
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: (0.0, 0.0, 0.0).into(),
+            float_height: enemy.height_from_ground,
+            ..default()
+        });
+    }
+}
+
+//==============================================================================================
+//        Enemy Spawning
+//==============================================================================================
