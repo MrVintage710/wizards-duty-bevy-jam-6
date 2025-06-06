@@ -78,28 +78,32 @@ pub struct EnemyAssets {
     pub skeleton_minion_spawn: Handle<AnimationClip>,
     #[asset(path = "models/enemy/Skeleton_Minion.glb#Animation39")]
     pub skeleton_minion_hit: Handle<AnimationClip>,
-    #[asset(path = "models/enemy/Skeleton_Minion.glb#Animation5")]
+    #[asset(path = "models/enemy/Skeleton_Minion.glb#Animation3")]
     pub skeleton_minion_stab: Handle<AnimationClip>,
     
     #[asset(path = "models/enemy/Skeleton_Mage.glb#Scene0")]
     pub skeleton_mage: Handle<Scene>,
+    
+    #[asset(path = "models/enemy/Skeleton_Blade.gltf#Scene0")]
+    pub skeleton_blade: Handle<Scene>,
 }
 
 #[derive(Resource)]
 pub struct EnemyAnimationGraphs {
     pub minion_graph: Handle<AnimationGraph>,
     pub minion_idle: AnimationNodeIndex,
-    pub minion_run: AnimationNodeIndex,
+    pub minion_run_top: AnimationNodeIndex,
+    pub minion_run_bottom: AnimationNodeIndex,
     pub minion_run_fast: AnimationNodeIndex,
     pub minion_spawn: AnimationNodeIndex,
     pub minion_stab: AnimationNodeIndex,
 }
 
 const MINION_UPPER: [&str; 4] = [
-    "Rig/root/hips/spine/chest",
-    "upperarm.l/lowerarm.l/wrist.l/hand.l/handslot.l",
-    "upperarm.r/lowerarm.r/wrist.r/hand.r/handslot.r",
-    "head",
+    "Rig/root/hips/spine",
+    "chest/upperarm.l/lowerarm.l/wrist.l/hand.l/handslot.l",
+    "chest/upperarm.r/lowerarm.r/wrist.r/hand.r/handslot.r",
+    "chest/head",
 ];
 
 const MINION_LOWER: [&str; 3] = [
@@ -111,13 +115,14 @@ const MINION_LOWER: [&str; 3] = [
 impl FromWorld for EnemyAnimationGraphs {
     fn from_world(world: &mut World) -> Self {
         let mut graph = AnimationGraph::new();
-        let assets = world.resource::<EnemyAssets>().clone();
-        
+        let assets = world.resource::<EnemyAssets>();
+    
         add_bones_mask(&mut graph, &MINION_UPPER, 0);
         add_bones_mask(&mut graph, &MINION_LOWER, 1);
     
         let minion_idle = graph.add_clip(assets.skeleton_minion_idle.clone(), 1.0, graph.root);
-        let minion_run = graph.add_clip_with_mask(assets.skeleton_minion_running.clone(), 0b11, 1.0, graph.root);
+        let minion_run_bottom = graph.add_clip_with_mask(assets.skeleton_minion_running.clone(), 0b01, 1.0, graph.root);
+        let minion_run_top = graph.add_clip_with_mask(assets.skeleton_minion_running.clone(), 0b10, 1.0, graph.root);
         let minion_run_fast = graph.add_clip(assets.skeleton_minion_running_fast.clone(), 1.0, graph.root);
         let minion_spawn = graph.add_clip(assets.skeleton_minion_spawn.clone(), 1.0, graph.root);
         let minion_stab = graph.add_clip_with_mask(assets.skeleton_minion_stab.clone(), 0b10, 1.0, graph.root);
@@ -125,7 +130,8 @@ impl FromWorld for EnemyAnimationGraphs {
         EnemyAnimationGraphs {
             minion_graph: world.resource_mut::<Assets<AnimationGraph>>().add(graph),
             minion_idle,
-            minion_run,
+            minion_run_top,
+            minion_run_bottom,
             minion_run_fast,
             minion_spawn,
             minion_stab,

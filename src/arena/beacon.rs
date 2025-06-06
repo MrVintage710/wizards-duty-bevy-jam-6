@@ -2,7 +2,7 @@
 use avian3d::prelude::{Collider, RigidBody};
 use bevy::prelude::*;
 
-use crate::{arena::{ArenaProp, Obstacle}, assets::BeaconAssets, util::{init_scene_root_with_animation, DefaultAnimationGraphMap, GameInit, SceneRootWithAnimation}, GameState};
+use crate::{arena::{ArenaProp, Obstacle}, assets::BeaconAssets, util::{GameInit, SceneRootWithAnimation}, GameState};
 
 //==============================================================================================
 //        Beacon Plugin
@@ -39,7 +39,8 @@ pub fn spawn_beacon(
         Collider::cuboid(1.0, 4.0, 1.0),
         RigidBody::Static,
         Transform::from_rotation(Quat::from_rotation_y(-45.0_f32.to_radians())),
-        SceneRootWithAnimation::new(assets.beacon.clone(), graphs.add(graph))
+        SceneRootWithAnimation::new(assets.beacon.clone())
+            .with_animation_graph(graphs.add(graph))
             .with_animation(id)
             .repeat()
     ));
@@ -51,28 +52,3 @@ pub fn spawn_beacon(
 
 #[derive(Component)]
 pub struct Beacon;
-
-// fn init_beacon_animations(
-//     mut commands: Commands,
-//     mut query: Query<(Entity, &mut AnimationPlayer), With<Beacon>>,
-//     mut graphs : ResMut<Assets<AnimationGraph>>,
-//     assets : Res<BeaconAssets>,
-//     mut done: Local<bool>,
-// ) {
-//     if *done {
-//         return;
-//     }
-
-//     for (entity, mut player) in query.iter_mut() {
-//         let (graph, animation_index) = AnimationGraph::from_clip(assets.animation.clone());
-        
-//         commands.entity(entity).insert(
-//             AnimationGraphHandle(graphs.add(graph))
-//         );
-    
-//         player.play(animation_index).repeat();
-    
-
-//         *done = true;
-//     }
-// }

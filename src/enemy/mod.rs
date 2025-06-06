@@ -252,11 +252,10 @@ pub fn debug_goto (
 //==============================================================================================
 
 pub fn enemy_idle_and_spawning(
-    mut enemy : Query<(&mut TnuaController, &mut EnemyBehavior, &Enemy)>,
+    mut enemy : Query<(&mut TnuaController, &EnemyBehavior, &Enemy)>,
 ) {
-    for (mut controller, mut behavior, enemy) in enemy.iter_mut() {
-        if !(matches!(behavior.as_ref(), &EnemyBehavior::Idle | &EnemyBehavior::Spawning)) {return;}
-        let EnemyBehavior::Idle = behavior.as_mut() else { continue; };
+    for (mut controller, behavior, enemy) in enemy.iter_mut() {
+        if !(matches!(behavior, &EnemyBehavior::Idle | &EnemyBehavior::Spawning)) {return;}
         controller.basis(TnuaBuiltinWalk {
             desired_velocity: (0.0, 0.0, 0.0).into(),
             float_height: enemy.height_from_ground,
@@ -266,5 +265,6 @@ pub fn enemy_idle_and_spawning(
 }
 
 //==============================================================================================
-//        Enemy Spawning
+//        Enemy General
 //==============================================================================================
+

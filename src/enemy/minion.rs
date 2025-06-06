@@ -5,7 +5,8 @@ use bevy::{prelude::*, transform};
 use bevy_seedling::sample::SamplePlayer;
 use bevy_tnua::{prelude::*, TnuaNotPlatform};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
-use crate::{assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{minion, Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
+use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshStatus}, NavMesh};
+use crate::{assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{minion, Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedModelFor, AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
 
 use super::EnemyBehavior;
 
@@ -26,7 +27,7 @@ impl Plugin for MinionPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_observer(spawn_minion_enemy)
-            .add_systems(Update, (minion_goto, minion_attack_player).in_set(SpecialEnemyBehavior))
+            .add_systems(Update, (minion_goto, minion_attack_player, minion_idle, manage_minion_animation).chain().in_set(SpecialEnemyBehavior))
         ;
     }
 }
@@ -92,7 +93,8 @@ pub fn spawn_minion_enemy(
         TnuaController::default(),
         TnuaAvian3dSensorShape(Collider::cylinder(0.49, 0.0)),
         TnuaNotPlatform,
-        SceneRootWithAnimation::new(enemy_assets.skeleton_minion.clone(), enemy_animation_graphs.minion_graph.clone())
+        SceneRootWithAnimation::new(enemy_assets.skeleton_minion.clone())
+            .with_animation_graph(enemy_animation_graphs.minion_graph.clone())
             .with_animation(enemy_animation_graphs.minion_spawn)
             .with_transform(Transform::from_translation((0.0, -1.0, 0.0).into()).with_rotation(Quat::from_rotation_y(PI as f32))),
     )).observe(on_minion_scene_added);
@@ -115,6 +117,35 @@ pub fn on_minion_scene_added(
 //        Animating the Minion
 //==============================================================================================
 
+fn manage_minion_animation(
+    minions : Query<(&LinearVelocity, &EnemyBehavior), With<Minion>>,
+    mut minion_animated_models : Query<(&AnimatedModelFor, &mut AnimationPlayer)>,
+    animations : Res<EnemyAnimationGraphs>,
+) {
+    for (animated_model_for, mut animation_player) in minion_animated_models.iter_mut() {
+        let Ok((minion_velocity, minion_behavior)) = minions.get(animated_model_for.0) else { continue; };
+        if matches!(minion_behavior, EnemyBehavior::Spawning) { continue; }
+        
+        let velocity_magnitude = minion_velocity.length();
+        let is_stab_finished = animation_player.animation(animations.minion_stab).map(|animation| animation.is_finished()).unwrap_or(false);
+        if is_stab_finished {
+            animation_player.stop(animations.minion_stab);
+        }
+        
+        if velocity_magnitude >= 0.05 {
+            animation_player.play(animations.minion_run_bottom).repeat();
+            
+            animation_player.stop(animations.minion_idle);
+            if !animation_player.is_playing_animation(animations.minion_stab) {
+                animation_player.play(animations.minion_run_top).repeat();
+            }
+        } else {
+            animation_player.stop(animations.minion_run_bottom);
+            animation_player.stop(animations.minion_run_top);
+            animation_player.play(animations.minion_idle).repeat();
+        }
+    }
+}
 
 
 //==============================================================================================
@@ -140,11 +171,17 @@ pub fn minion_goto (
     }
 }
 
+//==============================================================================================
+//        Minion Attack Player
+//==============================================================================================
+
 pub fn minion_attack_player(
     mut commmands : Commands,
     player : Single<&Transform, With<PlayerCharacter>>,
     player_assets : Res<WizardAssets>,
     mut minions : Query<(Entity, &mut EnemyBehavior, &mut TnuaController, &Transform, &mut Minion)>,
+    mut minion_animators : Query<(&AnimatedModelFor, &mut AnimationPlayer)>,
+    enemy_animation_graphs : Res<EnemyAnimationGraphs>,
     spacial_query : SpatialQuery,
     time : Res<Time>
 ) {
@@ -179,12 +216,52 @@ pub fn minion_attack_player(
             *behavior = EnemyBehavior::Idle;
         }
         
+        minion.attack_cooldown.tick(time.delta());
+        
         if enemies_within_attack_range.contains(&entity) && minion.attack_cooldown.just_finished() {
-            commmands.spawn((
+            let Some((_, mut animation_player)) = minion_animators.iter_mut().find(|i| i.0.0 == entity) else { continue };
+            // if animation_player.is_playing_animation(enemy_animation_graphs.minion_run_top) {
+                animation_player.stop(enemy_animation_graphs.minion_run_top);
+            // }
+            animation_player.start(enemy_animation_graphs.minion_stab);
+            commmands.spawn(
                 SamplePlayer::new(player_assets.oof1.clone())
-            ));
+            );
         }
         
-        minion.attack_cooldown.tick(time.delta());
+    }
+}
+
+//==============================================================================================
+//        Minion Idle Behavior
+//==============================================================================================
+
+pub fn minion_idle(
+    mut enemy : Query<(Entity,&mut TnuaController, &mut EnemyBehavior, &Enemy, &LinearVelocity)>,
+    player : Single<&Transform, With<PlayerCharacter>>,
+    spacial_query : SpatialQuery,
+    navmesh : Single<(&ManagedNavMesh, &NavMeshStatus)>,
+    navmeshes : Res<Assets<NavMesh>>
+) {
+    for (entity, mut controller, mut behavior, enemy, rb) in enemy.iter_mut() {
+        if !(matches!(behavior.as_ref(), &EnemyBehavior::Idle)) { return }
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: (0.0, 0.0, 0.0).into(),
+            float_height: enemy.height_from_ground,
+            ..default()
+        });
+        
+        let enemies_within_agro_range = spacial_query.shape_intersections(
+            &Collider::sphere(MINION_AGRO_RANGE),
+            player.translation, 
+            Quat::default(),                 // Shape rotation
+            &SpatialQueryFilter::default()
+        );
+        
+        if enemies_within_agro_range.contains(&entity) {
+            *behavior = EnemyBehavior::AttackPlayer;
+        } else {
+            
+        }
     }
 }

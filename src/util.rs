@@ -121,17 +121,20 @@ pub fn set_default_animation_after_load(
     let Some(entity) = scene_spawner.iter_instance_entities(trigger.instance_id).find(|e| instance_root.contains(*e)) else {
         return;
     };
-    for index in scene_root.animations.iter() {
-        let (_, mut animation_player) = instance_root.get_mut(entity).unwrap();
-        let options = animation_player.play(*index);
-        if scene_root.repeating {
-            options.repeat();
-        }
-    }
     
-    commands.entity(entity).insert((AnimationGraphHandle(scene_root.animation_graph.clone()), AnimatedModelFor(*controler_entity)));
     if let Some(transform) = scene_root.transform {
         commands.entity(entity).insert(transform);
+    }
+    
+    if let Some(graph) = &scene_root.animation_graph {
+        commands.entity(entity).insert((AnimationGraphHandle(graph.clone()), AnimatedModelFor(*controler_entity)));
+        for index in scene_root.animations.iter() {
+            let (_, mut animation_player) = instance_root.get_mut(entity).unwrap();
+            let options = animation_player.play(*index);
+            if scene_root.repeating {
+                options.repeat();
+            }
+        }
     }
     commands.trigger_targets(AnimatedSceneCreated(entity), *controler_entity);
 }
@@ -139,21 +142,26 @@ pub fn set_default_animation_after_load(
 #[derive(Component, Clone)]
 pub struct SceneRootWithAnimation {
     pub scene : Handle<Scene>,
-    pub animation_graph : Handle<AnimationGraph>,
+    pub animation_graph : Option<Handle<AnimationGraph>>,
     pub animations : Vec<AnimationNodeIndex>,
     pub repeating : bool,
     pub transform : Option<Transform>,
 }
 
 impl SceneRootWithAnimation {
-    pub fn new(scene: Handle<Scene>, animation_graph: Handle<AnimationGraph>) -> Self {
+    pub fn new(scene: Handle<Scene>) -> Self {
         Self {
             scene,
-            animation_graph,
+            animation_graph : None,
             animations: Vec::new(),
             repeating: false,
             transform: None,
         }
+    }
+    
+    pub fn with_animation_graph(mut self, animation_graph: Handle<AnimationGraph>) -> Self {
+        self.animation_graph = Some(animation_graph);
+        self
     }
     
     pub fn with_animation(mut self, animation: AnimationNodeIndex) -> Self {
@@ -191,11 +199,11 @@ pub struct AnimatedSceneCreated(pub Entity);
 /// Add it to an entity that "likes" another entity.
 #[derive(Component)]
 #[relationship(relationship_target = AnimationControlerFor)]
-struct AnimatedModelFor(pub Entity);
+pub struct AnimatedModelFor(pub Entity);
 
 /// This is the "relationship target" component.
 /// It will be automatically inserted and updated to contain
 /// all entities that currently "like" this entity.
 #[derive(Component, Deref)]
 #[relationship_target(relationship = AnimatedModelFor)]
-struct AnimationControlerFor(Vec<Entity>);
+pub struct AnimationControlerFor(Vec<Entity>);
