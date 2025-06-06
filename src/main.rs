@@ -119,7 +119,10 @@ fn setup(
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 5.5, 1.0, 0.0))
     ));
     
-    commands.trigger(SpawnEnemiesEventBuilder::new((-5.0, 0.0, -5.0).into()).with_weight(EnemyType::Minion, 1).build());
+    
+    commands.trigger(SpawnEnemiesEventBuilder::new((-15.0, 0.0, -15.0).into()).with_weight(EnemyType::Minion, 1).with_number_of_enemies(10).build());
+    
+    
 }
 
 

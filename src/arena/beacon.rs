@@ -1,8 +1,8 @@
 
 use avian3d::prelude::{Collider, RigidBody};
-use bevy::prelude::*;
+use bevy::{ecs::system::SystemParam, prelude::*};
 
-use crate::{arena::{ArenaProp, Obstacle}, assets::BeaconAssets, util::{GameInit, SceneRootWithAnimation}, GameState};
+use crate::{arena::{ArenaProp, NavmeshQuery, Obstacle}, assets::BeaconAssets, util::{GameInit, Health, SceneRootWithAnimation}, GameState};
 
 //==============================================================================================
 //        Beacon Plugin
@@ -39,6 +39,7 @@ pub fn spawn_beacon(
         Collider::cuboid(1.0, 4.0, 1.0),
         RigidBody::Static,
         Transform::from_rotation(Quat::from_rotation_y(-45.0_f32.to_radians())),
+        Health::new(1000),
         SceneRootWithAnimation::new(assets.beacon.clone())
             .with_animation_graph(graphs.add(graph))
             .with_animation(id)
@@ -52,3 +53,36 @@ pub fn spawn_beacon(
 
 #[derive(Component)]
 pub struct Beacon;
+
+//==============================================================================================
+//        Beceaon Util
+//==============================================================================================
+
+const CLOSEST_POINT_RADIUS_DEFAULT: f32 = 2.0;
+
+#[derive(SystemParam)]
+pub struct BeaconQuery<'w> {
+    pub beacon: Single<'w, (&'static Transform, &'static mut Health), With<Beacon>>,
+}
+
+impl<'w> BeaconQuery<'w> {
+    
+    pub fn closest_point(&self, other : &Transform, range : f32) -> Vec2 {
+        let other = other.translation.xz();
+        let beacon = self.beacon.0.translation.xz();
+        
+        let inbetween = -(beacon - other).normalize();
+        let closest = inbetween * range;
+        
+        closest
+    }
+    
+    pub fn within_range(&self, other : &Transform, range : f32) -> bool {
+        let other = other.translation.xz();
+        let beacon = self.beacon.0.translation.xz();
+        
+        let distance = (beacon - other).length();
+        
+        distance <= range
+    }
+}

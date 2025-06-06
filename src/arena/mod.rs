@@ -1,8 +1,9 @@
 use std::f32::consts::FRAC_PI_2;
-use bevy::{color::palettes, prelude::*};
+use bevy::{color::palettes, ecs::system::SystemParam, prelude::*};
 use avian3d::prelude::*;
-use vleue_navigator::{prelude::{NavMeshSettings, NavMeshStatus, NavMeshUpdateMode}, NavMeshDebug, Triangulation};
+use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshSettings, NavMeshStatus, NavMeshUpdateMode}, NavMesh, NavMeshDebug, Triangulation};
 use crate::{arena::beacon::{spawn_beacon, BeaconPlugin}, GameState};
+use vleue_navigator::{prelude::*, Path};
 
 pub mod beacon;
 
@@ -76,4 +77,26 @@ pub fn build_arena(
         NavMeshUpdateMode::Direct,
         Transform::from_xyz(0.0, 0.1, 0.0).with_rotation(Quat::from_rotation_x(FRAC_PI_2)),
     ));
+}
+
+//==============================================================================================
+//        Navemsh Query Param
+//==============================================================================================
+
+#[derive(SystemParam)]
+pub struct NavmeshQuery<'w> {
+    navmesh : Single<'w, (&'static ManagedNavMesh, &'static NavMeshStatus)>,
+    navmeshes : Res<'w, Assets<NavMesh>>
+}
+
+impl<'w> NavmeshQuery<'w> {
+    pub fn new(navmesh: Single<'w, (&'static ManagedNavMesh, &'static NavMeshStatus)>, navmeshes: Res<'w, Assets<NavMesh>>) -> Self {
+        Self { navmesh, navmeshes }
+    }
+    
+    pub fn path_from_tranform(&self, from : &Transform, to : Vec2) -> Option<Path> {
+        if *self.navmesh.1 != NavMeshStatus::Built { return None};
+        let Some(navmesh) = self.navmeshes.get(self.navmesh.0.id()) else { return None};
+        navmesh.path(from.translation.xz(), to)
+    }
 }

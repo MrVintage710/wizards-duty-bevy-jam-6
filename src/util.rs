@@ -2,9 +2,7 @@
 use std::collections::HashMap;
 
 use avian3d::prelude::{CollisionLayers, PhysicsLayer};
-use bevy::{ecs::{entity, schedule::ScheduleLabel}, prelude::*, scene::{InstanceId, SceneInstanceReady}, state::commands};
-
-use crate::{enemy::minion::minion_stabbed, GameState};
+use bevy::{prelude::*, scene::{InstanceId, SceneInstanceReady}};
 
 //==============================================================================================
 //        InitGame Schedule
@@ -79,7 +77,7 @@ impl Plugin for DefaultSceneAnimationPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<DefaultAnimationGraphMap>()
-            .add_systems(OnEnter(GameState::InGame), init_scene_root_with_animation.in_set(PostGameInit))
+            .add_systems(Update, init_scene_root_with_animation)
             .add_observer(set_default_animation_after_load)
         ;
     }
@@ -118,13 +116,14 @@ pub fn set_default_animation_after_load(
         return;
     };
     
+    if let (Some(first), Some(transform)) = (scene_spawner.iter_instance_entities(trigger.instance_id).take(1).collect::<Vec<_>>().first(), scene_root.transform) {
+        commands.entity(*first).insert(transform);
+    }
+    
+    
     let Some(entity) = scene_spawner.iter_instance_entities(trigger.instance_id).find(|e| instance_root.contains(*e)) else {
         return;
     };
-    
-    if let Some(transform) = scene_root.transform {
-        commands.entity(entity).insert(transform);
-    }
     
     if let Some(graph) = &scene_root.animation_graph {
         commands.entity(entity).insert((AnimationGraphHandle(graph.clone()), AnimatedModelFor(*controler_entity)));
@@ -136,7 +135,7 @@ pub fn set_default_animation_after_load(
             }
         }
     }
-    commands.trigger_targets(AnimatedSceneCreated(entity), *controler_entity);
+    commands.trigger_targets(AnimatedSceneCreated(entity, trigger.instance_id), *controler_entity);
 }
 
 #[derive(Component, Clone)]
@@ -181,7 +180,7 @@ impl SceneRootWithAnimation {
 }
 
 pub fn init_scene_root_with_animation(
-    scene_roots : Query<(Entity, &SceneRootWithAnimation)>,
+    scene_roots : Query<(Entity, &SceneRootWithAnimation), Added<SceneRootWithAnimation>>,
     mut scene_spawner : ResMut<SceneSpawner>,
     mut animation_graphs : ResMut<DefaultAnimationGraphMap>,
 ) {
@@ -193,7 +192,7 @@ pub fn init_scene_root_with_animation(
 }
 
 #[derive(Event, Clone)]
-pub struct AnimatedSceneCreated(pub Entity);
+pub struct AnimatedSceneCreated(pub Entity, pub InstanceId);
 
 /// This is a "relationship" component.
 /// Add it to an entity that "likes" another entity.

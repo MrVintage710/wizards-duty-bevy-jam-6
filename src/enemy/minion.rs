@@ -1,19 +1,18 @@
 use std::f64::consts::PI;
 
 use avian3d::prelude::*;
-use bevy::{prelude::*, transform};
+use bevy::{animation::AnimationTarget, prelude::*};
 use bevy_seedling::sample::SamplePlayer;
 use bevy_tnua::{prelude::*, TnuaNotPlatform};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
-use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshStatus}, NavMesh};
-use crate::{assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{minion, Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedModelFor, AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
+use crate::{arena::beacon::BeaconQuery, assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedModelFor, AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
 
 use super::EnemyBehavior;
 
 const MINION_HEIGHT: f32 = 1.0;
 const MINION_HEALTH: u32 = 5;
 const MINION_SPEED: f32 = 3.0;
-const MINION_AGRO_RANGE: f32 = 10.0;
+const MINION_AGRO_RANGE: f32 = 5.0;
 const MINION_ATTACK_COOLDOWN: f32 = 2.0;
 const MINION_ATTACK_RANGE: f32 = 1.5;
 
@@ -76,7 +75,6 @@ pub fn spawn_minion_enemy(
     if trigger.1 != EnemyType::Minion { return }
     let position = trigger.0;
     
-    
     commands.spawn((
         Name::new("Minion"),
         Transform::from_translation(Vec3::new(position.x, MINION_HEIGHT, position.z)),
@@ -103,7 +101,10 @@ pub fn spawn_minion_enemy(
 pub fn on_minion_scene_added(
     trigger : Trigger<AnimatedSceneCreated>,
     named : Query<&Name>,
-    mut commands : Commands
+    mut commands : Commands,
+    spawner : Res<SceneSpawner>,
+    rig : Query<(Entity, &Name), With<AnimationTarget>>,
+    assets : Res<EnemyAssets>
 ) {
     let controler = trigger.target().clone();
     println!("{:?}", named.get(controler));
@@ -111,6 +112,19 @@ pub fn on_minion_scene_added(
         let Ok(mut enemy_behavior) = enemies.get_mut(controler) else { return; };
         *enemy_behavior = EnemyBehavior::Idle;
     });
+    
+    let hand = spawner.iter_instance_entities(trigger.1)
+        .filter_map(|e| rig.get(e).map(|part| Some(part)).unwrap_or(None))
+        .find(|part| part.1.as_str() == "handslot.r")
+    ;
+    
+    if let Some(hand) = hand {
+        let transform = Transform::from_rotation(Quat::from_rotation_y(PI as f32));
+        commands.entity(hand.0).insert(
+            SceneRootWithAnimation::new(assets.skeleton_blade.clone())
+                .with_transform(transform)
+        );
+    }
 }
 
 //==============================================================================================
@@ -237,13 +251,12 @@ pub fn minion_attack_player(
 //==============================================================================================
 
 pub fn minion_idle(
-    mut enemy : Query<(Entity,&mut TnuaController, &mut EnemyBehavior, &Enemy, &LinearVelocity)>,
+    mut enemy : Query<(Entity,&mut TnuaController, &mut EnemyBehavior, &Enemy, &LinearVelocity, &Transform)>,
     player : Single<&Transform, With<PlayerCharacter>>,
     spacial_query : SpatialQuery,
-    navmesh : Single<(&ManagedNavMesh, &NavMeshStatus)>,
-    navmeshes : Res<Assets<NavMesh>>
+    beacon : BeaconQuery,
 ) {
-    for (entity, mut controller, mut behavior, enemy, rb) in enemy.iter_mut() {
+    for (entity, mut controller, mut behavior, enemy, rb, transform) in enemy.iter_mut() {
         if !(matches!(behavior.as_ref(), &EnemyBehavior::Idle)) { return }
         controller.basis(TnuaBuiltinWalk {
             desired_velocity: (0.0, 0.0, 0.0).into(),
@@ -260,8 +273,10 @@ pub fn minion_idle(
         
         if enemies_within_agro_range.contains(&entity) {
             *behavior = EnemyBehavior::AttackPlayer;
+        } else if beacon.within_range(transform, MINION_ATTACK_RANGE) {
+            *behavior = EnemyBehavior::AttackBeacon;
         } else {
-            
+            *behavior = EnemyBehavior::goto(beacon.closest_point(transform, MINION_ATTACK_RANGE))
         }
     }
 }

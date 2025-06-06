@@ -1,12 +1,10 @@
-use avian3d::position;
-use bevy::{ecs::system::IntoObserverSystem, prelude::*};
+use bevy::prelude::*;
 use bevy_tnua::prelude::*;
-use minion::{spawn_minion_enemy};
 use strum::{EnumCount, FromRepr};
-use vleue_navigator::{prelude::{ManagedNavMesh, NavMeshStatus}, NavMesh, Path};
+use vleue_navigator::{prelude::*, Path};
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::{arena::Ground, assets::EnemyAssets, enemy::{self, minion::MinionPlugin}, util::Health};
+use crate::{arena::NavmeshQuery, enemy::minion::MinionPlugin, util::Health};
 
 pub mod minion;
 
@@ -90,15 +88,11 @@ pub enum EnemyBehavior {
     Spawning,
     Guard,
     Goto(Vec2, Option<Path>, usize),
-    AttackBeacon(Option<Path>, usize),
+    AttackBeacon,
     AttackPlayer,
 }
 
-impl EnemyBehavior {
-    pub fn attack_beacon() -> Self {
-        EnemyBehavior::AttackBeacon(None, 0)
-    }
-    
+impl EnemyBehavior {    
     pub fn goto(position : Vec2) -> Self {
         EnemyBehavior::Goto(position, None, 0)
     }
@@ -197,34 +191,43 @@ pub fn check_for_dead_enemies (
 
 pub fn enemy_goto(
     mut enemy : Query<(&Transform, &mut TnuaController, &mut EnemyBehavior, &Enemy)>,
-    navmesh : Single<(&ManagedNavMesh, &NavMeshStatus)>,
-    navmeshes : Res<Assets<NavMesh>>
+    navmesh : NavmeshQuery,
 ) {
-    if *navmesh.1 != NavMeshStatus::Built { return };
-    let Some(navmesh) = navmeshes.get(navmesh.0.id()) else { return };
-    
     for (transform, mut controller, mut behavior, enemy) in enemy.iter_mut() {
-        let EnemyBehavior::Goto(destination, current_path, index) = behavior.as_mut() else { continue; };
-        let current_location = Vec2::new(transform.translation.x, transform.translation.z);
-        if let None = current_path {
-            let path = navmesh.path(current_location, *destination);
-            *current_path = path;
-        }
+        let should_be_idle = {
+            let EnemyBehavior::Goto(destination, current_path, index) = behavior.as_mut() else { continue; };
+            let current_location = Vec2::new(transform.translation.x, transform.translation.z);
+            if let None = current_path {
+                let path = navmesh.path_from_tranform(transform, *destination);
+                *current_path = path;
+            }
+            
+            let current_path = current_path.as_ref().unwrap();
+            let current_node = current_path.path.get(*index).unwrap_or(destination);
+            
+            let direction_to_next = (current_node - current_location).normalize_or_zero();
+            let move_2d = direction_to_next * enemy.speed;
+            controller.basis(TnuaBuiltinWalk {
+                desired_velocity: (move_2d.x, 0.0, move_2d.y).into(),
+                float_height: enemy.height_from_ground,
+                desired_forward: Some(Dir3::from_xyz_unchecked(direction_to_next.x, 0.0, direction_to_next.y)),
+                ..default()
+            });
+            
+            if current_location.distance(*current_node) < 0.3 && *index < current_path.path.len() {
+                *index += 1;
+                if *index == current_path.path.len() {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        };
         
-        let current_path = current_path.as_ref().unwrap();
-        let current_node = current_path.path.get(*index).unwrap_or(destination);
-        
-        let direction_to_next = (current_node - current_location).normalize_or_zero();
-        let move_2d = direction_to_next * enemy.speed;
-        controller.basis(TnuaBuiltinWalk {
-            desired_velocity: (move_2d.x, 0.0, move_2d.y).into(),
-            float_height: enemy.height_from_ground,
-            desired_forward: Some(Dir3::from_xyz_unchecked(direction_to_next.x, 0.0, direction_to_next.y)),
-            ..default()
-        });
-        
-        if current_location.distance(*current_node) < 0.3 && *index < current_path.path.len() {
-            *index += 1;
+        if should_be_idle {
+            *behavior = EnemyBehavior::Idle;
         }
     }
 }
@@ -268,3 +271,13 @@ pub fn enemy_idle_and_spawning(
 //        Enemy General
 //==============================================================================================
 
+#[derive(Component)]
+#[relationship(relationship_target = Hands)]
+pub struct HandFor(pub Entity);
+
+/// This is the "relationship target" component.
+/// It will be automatically inserted and updated to contain
+/// all entities that currently "like" this entity.
+#[derive(Component, Deref)]
+#[relationship_target(relationship = HandFor)]
+pub struct Hands(Vec<Entity>);
