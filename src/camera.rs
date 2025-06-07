@@ -70,7 +70,7 @@ pub fn camera_follow(
     
     if let Projection::Orthographic(ortho) = cam.as_mut() {
         if let ScalingMode::FixedVertical { viewport_height } = &mut ortho.scaling_mode {
-            *viewport_height = 6.0 + (6.0 * cam_focus.zoom)
+            *viewport_height = 12.0 + (3.0 * cam_focus.zoom)
         }
     }
 }
@@ -94,7 +94,7 @@ pub fn spawn_camera(
                 Camera3d::default(),
                 Projection::from(OrthographicProjection {
                     // 6 world units per pixel of window height.
-                    scaling_mode: bevy::render::camera::ScalingMode::FixedVertical { viewport_height: 6.0 },
+                    scaling_mode: bevy::render::camera::ScalingMode::FixedVertical { viewport_height: 12.0 },
                     ..OrthographicProjection::default_3d()
                 }),
                 #[cfg(feature = "native")]

@@ -187,7 +187,6 @@ pub fn init_scene_root_with_animation(
     for (entity, scene_root) in scene_roots.iter() {
         let instance_id = scene_spawner.spawn_as_child(scene_root.scene.clone(), entity);
         animation_graphs.insert(instance_id, scene_root.clone(), entity);
-        println!("Running {instance_id:?}");
     }
 }
 
@@ -206,3 +205,11 @@ pub struct AnimatedModelFor(pub Entity);
 #[derive(Component, Deref)]
 #[relationship_target(relationship = AnimatedModelFor)]
 pub struct AnimationControlerFor(Vec<Entity>);
+
+//===============================================================================================
+//          Vec2 -> Vec3
+//===============================================================================================
+
+pub fn vec2_vec3(v : Vec2) -> Vec3 {
+    return (v.x, 0.0, v.y).into()
+}

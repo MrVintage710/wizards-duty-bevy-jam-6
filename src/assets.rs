@@ -1,8 +1,7 @@
 use std::{collections::{HashMap, HashSet}, hash::Hash, u64};
 
-use bevy::{animation::{graph::AnimationNodeIndex, AnimationTargetId}, prelude::*};
+use bevy::{animation::{graph::AnimationNodeIndex, AnimationTargetId}, audio::Source, prelude::*};
 use bevy_asset_loader::{asset_collection::AssetCollection, loading_state::{config::ConfigureLoadingState, LoadingState, LoadingStateAppExt}};
-use bevy_seedling::sample::Sample;
 
 use crate::{assets, enemy::{minion::MinionStabbed, EnemySpawnAnimationComplete}, GameState};
 
@@ -41,9 +40,9 @@ pub struct WizardAssets {
     #[asset(path = "models/wizard/Mage.glb#Scene0")]
     pub wizard: Handle<Scene>,
     #[asset(path = "sounds/oof1.ogg")]
-    pub oof1: Handle<Sample>,
+    pub oof1: Handle<AudioSource>,
     #[asset(path = "sounds/oof2.ogg")]
-    pub oof2: Handle<Sample>,
+    pub oof2: Handle<AudioSource>,
 }
 
 pub struct WizardAnimationGraph {

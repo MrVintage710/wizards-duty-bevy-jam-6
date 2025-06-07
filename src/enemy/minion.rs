@@ -2,7 +2,6 @@ use std::f64::consts::PI;
 
 use avian3d::prelude::*;
 use bevy::{animation::AnimationTarget, prelude::*};
-use bevy_seedling::sample::SamplePlayer;
 use bevy_tnua::{prelude::*, TnuaNotPlatform};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use crate::{arena::beacon::BeaconQuery, assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedModelFor, AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
@@ -87,8 +86,7 @@ pub fn spawn_minion_enemy(
         Health::new(MINION_HEALTH),
         EnemyBehavior::Spawning,
         CollisionLayers::new(GameCollisionLayer::Enemy, [
-            GameCollisionLayer::Player, 
-            GameCollisionLayer::Enemy, 
+            GameCollisionLayer::Player,
             GameCollisionLayer::Default, 
             GameCollisionLayer::Spell,
         ]),
@@ -106,14 +104,12 @@ pub fn spawn_minion_enemy(
 
 pub fn on_minion_scene_added(
     trigger : Trigger<AnimatedSceneCreated>,
-    named : Query<&Name>,
     mut commands : Commands,
     spawner : Res<SceneSpawner>,
     rig : Query<(Entity, &Name), With<AnimationTarget>>,
     assets : Res<EnemyAssets>
 ) {
     let controler = trigger.target().clone();
-    println!("{:?}", named.get(controler));
     commands.entity(trigger.0).observe(move |_ : Trigger<EnemySpawnAnimationComplete>, mut enemies : Query<&mut EnemyBehavior, With<Enemy>>| {
         let Ok(mut enemy_behavior) = enemies.get_mut(controler) else { return; };
         *enemy_behavior = EnemyBehavior::Idle;
@@ -240,13 +236,8 @@ pub fn minion_attack_player(
         
         if enemies_within_attack_range.contains(&entity) && minion.attack_cooldown.just_finished() {
             let Some((_, mut animation_player)) = minion_animators.iter_mut().find(|i| i.0.0 == entity) else { continue };
-            // if animation_player.is_playing_animation(enemy_animation_graphs.minion_run_top) {
-                animation_player.stop(enemy_animation_graphs.minion_run_top);
-            // }
+            animation_player.stop(enemy_animation_graphs.minion_run_top);
             animation_player.start(enemy_animation_graphs.minion_stab);
-            commmands.spawn(
-                SamplePlayer::new(player_assets.oof1.clone())
-            );
         }
         
     }
@@ -286,3 +277,7 @@ pub fn minion_idle(
         }
     }
 }
+
+//===============================================================================================
+//          Minion 
+//===============================================================================================

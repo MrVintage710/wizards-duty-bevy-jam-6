@@ -1,17 +1,21 @@
-use bevy::prelude::*;
+use avian3d::prelude::{Collider, SpatialQuery, SpatialQueryFilter};
+use bevy::{color::palettes, ecs::entity, gizmos, platform::collections::HashMap, prelude::*};
 use bevy_tnua::prelude::*;
 use rand::Rng;
 use strum::{EnumCount, FromRepr};
 use vleue_navigator::{prelude::*, Path};
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
 
-use crate::{arena::NavmeshQuery, enemy::minion::MinionPlugin, util::Health};
+use crate::{arena::NavmeshQuery, enemy::minion::MinionPlugin, util::{vec2_vec3, Health}};
 
 pub mod minion;
 
 const MAX_ENEMIES: u32 = 1000;
 const SPAWN_RADIUS: i32 = 7;
 const MAX_ENEMIES_PER_SPAWN: u32 = 20;
+const ENEMY_CROWDING_SPACE : f32 = 5.0;
+const ENEMY_SEPORATION_FACTOR : f32 = 0.9;
+const ENENY_CORNER_CUTTING : f32 = 0.5;
 
 //==============================================================================================
 //        Enemy Plguin
@@ -40,7 +44,7 @@ impl Plugin for EnemyPlugin {
             
             .add_observer(spawn_enemies)
         
-            .add_systems(Update, (enemy_goto, enemy_idle_and_spawning).in_set(DefaultEnemyBehavior))
+            .add_systems(Update, (enemy_idle_and_spawning, enemy_goto).chain().in_set(DefaultEnemyBehavior))
             .add_systems(PostUpdate, check_for_dead_enemies)
         ;
         
@@ -60,7 +64,7 @@ pub struct Enemy {
     pub speed : f32,
 }
 
-//==============================================================================================
+//============================================================================================== 
 //        Enemy General Stuff
 //==============================================================================================
 
@@ -164,8 +168,8 @@ pub fn spawn_enemies(
     mut enemy_count: ResMut<EnemyCount>
 ) {
     let mut rng = rand::rng();
-    let rand_vec = Vec3::new(rng.random_range(-SPAWN_RADIUS..=SPAWN_RADIUS) as f32, 0.0, rng.random_range(-SPAWN_RADIUS..=SPAWN_RADIUS) as f32);
     for enemy in trigger.collect().into_iter() {
+        let rand_vec = Vec3::new(rng.random_range(-SPAWN_RADIUS..=SPAWN_RADIUS) as f32, 0.0, rng.random_range(-SPAWN_RADIUS..=SPAWN_RADIUS) as f32);
         if enemy_count.0 > MAX_ENEMIES { return }
         commands.trigger(SpawnEnemy(trigger.0 + rand_vec, enemy));
         enemy_count.0 += 1;
@@ -194,45 +198,92 @@ pub fn check_for_dead_enemies (
 //==============================================================================================
 
 pub fn enemy_goto(
-    mut enemy : Query<(&Transform, &mut TnuaController, &mut EnemyBehavior, &Enemy)>,
+    mut enemies : Query<(Entity, &Transform, &mut TnuaController, &mut EnemyBehavior, &Enemy)>,
     navmesh : NavmeshQuery,
+    spacial_query: SpatialQuery,
+    mut gizmos : Gizmos,
 ) {
-    for (transform, mut controller, mut behavior, enemy) in enemy.iter_mut() {
-        let should_be_idle = {
-            let EnemyBehavior::Goto(destination, current_path, index) = behavior.as_mut() else { continue; };
-            let current_location = Vec2::new(transform.translation.x, transform.translation.z);
-            if let None = current_path {
-                let path = navmesh.path_from_tranform(transform, *destination);
-                *current_path = path;
-            }
-            
-            let current_path = current_path.as_ref().unwrap();
-            let current_node = current_path.path.get(*index).unwrap_or(destination);
-            
-            let direction_to_next = (current_node - current_location).normalize_or_zero();
-            let move_2d = direction_to_next * enemy.speed;
-            controller.basis(TnuaBuiltinWalk {
-                desired_velocity: (move_2d.x, 0.0, move_2d.y).into(),
-                float_height: enemy.height_from_ground,
-                desired_forward: Some(Dir3::from_xyz_unchecked(direction_to_next.x, 0.0, direction_to_next.y)),
-                ..default()
-            });
-            
-            if current_location.distance(*current_node) < 0.3 && *index < current_path.path.len() {
-                *index += 1;
-                if *index == current_path.path.len() {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        };
+    //Get all enemies that are in the goto behavior
+    let mut enemies = enemies.iter_mut()
+        .filter_map(|(entity, transform, controller, behavior, enemy)| {
+            if !behavior.is_goto() { return None };
+            Some((entity, (transform, controller, behavior, enemy)))
+        })
+        .collect::<HashMap<_, _>>()
+    ;
+
+    let intended_velocities = enemies.iter().map(|(entity, (transform, _, behavior, enemy))| {
+        let nearby_enmemies = spacial_query.shape_intersections(
+            &Collider::sphere(2.0), 
+            transform.translation, 
+            Quat::default(), 
+            &SpatialQueryFilter::default(), 
+        );
+
+        let nearby_enemies =  nearby_enmemies.iter().filter_map(|e| {
+            if e == entity { return None }
+            enemies.get(e).map(|i| Some(i.0)).unwrap_or(None)
+        });
+
+        let mut avoiding = 0;
+        let mut speration_velocity = Vec2::default();
+        let current_location = transform.translation.xz();
         
-        if should_be_idle {
-            *behavior = EnemyBehavior::Idle;
+        for other in nearby_enemies {
+            let other_location = other.translation.xz();
+            let distance = current_location.distance(other_location);
+            if distance < ENEMY_CROWDING_SPACE {
+                let direction_away = (current_location - other_location).normalize_or_zero();
+                let weighted_velocity = direction_away / distance;
+                speration_velocity += weighted_velocity;
+                avoiding += 1;
+            }
         }
+
+        if avoiding > 0 {
+            speration_velocity /= avoiding as f32;
+            speration_velocity *= ENEMY_SEPORATION_FACTOR;
+        }
+
+        let EnemyBehavior::Goto(destination, Some(path), index) = behavior.as_ref() else { return (entity.clone(), (speration_velocity, speration_velocity.normalize_or_zero()))};
+        let current_node = path.path.get(*index).unwrap_or(destination);
+
+        let desired_velocity = (current_node - current_location).normalize_or_zero() * enemy.speed;
+        
+        let indended_velocity = speration_velocity + desired_velocity;
+        gizmos.ray(transform.translation + enemy.height_from_ground, vec2_vec3(speration_velocity), bevy::color::palettes::tailwind::BLUE_500);
+        gizmos.ray(transform.translation + enemy.height_from_ground, vec2_vec3(desired_velocity), bevy::color::palettes::tailwind::RED_500);
+        gizmos.ray(transform.translation + enemy.height_from_ground, vec2_vec3(indended_velocity), bevy::color::palettes::tailwind::VIOLET_500);
+        (entity.clone(), (indended_velocity, indended_velocity.normalize_or_zero()))
+    }).collect::<HashMap<Entity, _>>();
+    
+    for (entity, (intended_velocity, intended_direction)) in intended_velocities.into_iter() {
+        let Some((transform, controller, behavior, enemy)) = enemies.get_mut(&entity) else { unreachable!() };
+        let direction = if intended_direction.length_squared() == 0.0 {None} else {Some(Dir3::from_xyz_unchecked(intended_direction.x, 0.0, intended_direction.y))};
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: (intended_velocity.x, 0.0, intended_velocity.y).into(),
+            float_height: enemy.height_from_ground,
+            desired_forward: direction,
+            ..default()
+        });
+
+        let should_be_idle = {
+            let EnemyBehavior::Goto(destination, path, index) = behavior.as_mut() else { continue };
+            if path.is_none() {
+                *path = navmesh.path_from_tranform(&transform, *destination);
+                if path.is_none() { continue; }
+            }
+            let path = path.as_ref().unwrap();
+            let current_node = path.path.get(*index).unwrap_or(destination);
+    
+            if transform.translation.xz().distance(*current_node) < ENENY_CORNER_CUTTING {
+                *index += 1
+            }
+    
+            *index >= path.path.len()
+        };
+
+        if should_be_idle { **behavior = EnemyBehavior::Idle }
     }
 }
 
