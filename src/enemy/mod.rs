@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_tnua::prelude::*;
+use rand::Rng;
 use strum::{EnumCount, FromRepr};
 use vleue_navigator::{prelude::*, Path};
 use weighted_rand::{builder::{NewBuilder, WalkerTableBuilder}, table::WalkerTable};
@@ -9,6 +10,8 @@ use crate::{arena::NavmeshQuery, enemy::minion::MinionPlugin, util::Health};
 pub mod minion;
 
 const MAX_ENEMIES: u32 = 1000;
+const SPAWN_RADIUS: i32 = 7;
+const MAX_ENEMIES_PER_SPAWN: u32 = 20;
 
 //==============================================================================================
 //        Enemy Plguin
@@ -160,10 +163,11 @@ pub fn spawn_enemies(
     mut commands : Commands,
     mut enemy_count: ResMut<EnemyCount>
 ) {
-    if enemy_count.0 > MAX_ENEMIES { return }
-    
+    let mut rng = rand::rng();
+    let rand_vec = Vec3::new(rng.random_range(-SPAWN_RADIUS..=SPAWN_RADIUS) as f32, 0.0, rng.random_range(-SPAWN_RADIUS..=SPAWN_RADIUS) as f32);
     for enemy in trigger.collect().into_iter() {
-        commands.trigger(SpawnEnemy(trigger.0, enemy));
+        if enemy_count.0 > MAX_ENEMIES { return }
+        commands.trigger(SpawnEnemy(trigger.0 + rand_vec, enemy));
         enemy_count.0 += 1;
     }
 }

@@ -15,6 +15,7 @@ const MINION_SPEED: f32 = 3.0;
 const MINION_AGRO_RANGE: f32 = 5.0;
 const MINION_ATTACK_COOLDOWN: f32 = 2.0;
 const MINION_ATTACK_RANGE: f32 = 1.5;
+const MINION_BEACON_ATTACK_RANGE: f32 = 2.5;
 
 //==============================================================================================
 //        Minion Plugin
@@ -85,7 +86,12 @@ pub fn spawn_minion_enemy(
         },
         Health::new(MINION_HEALTH),
         EnemyBehavior::Spawning,
-        CollisionLayers::new(GameCollisionLayer::Enemy, [GameCollisionLayer::Player, GameCollisionLayer::Default, GameCollisionLayer::Spell]),
+        CollisionLayers::new(GameCollisionLayer::Enemy, [
+            GameCollisionLayer::Player, 
+            GameCollisionLayer::Enemy, 
+            GameCollisionLayer::Default, 
+            GameCollisionLayer::Spell,
+        ]),
         RigidBody::Dynamic,
         Collider::capsule(0.5, 0.5),
         TnuaController::default(),
@@ -273,10 +279,10 @@ pub fn minion_idle(
         
         if enemies_within_agro_range.contains(&entity) {
             *behavior = EnemyBehavior::AttackPlayer;
-        } else if beacon.within_range(transform, MINION_ATTACK_RANGE) {
+        } else if beacon.within_range(transform, MINION_BEACON_ATTACK_RANGE) {
             *behavior = EnemyBehavior::AttackBeacon;
         } else {
-            *behavior = EnemyBehavior::goto(beacon.closest_point(transform, MINION_ATTACK_RANGE))
+            *behavior = EnemyBehavior::goto(beacon.closest_point(transform, MINION_BEACON_ATTACK_RANGE))
         }
     }
 }
