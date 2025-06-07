@@ -79,6 +79,9 @@ pub struct EnemyAssets {
     pub skeleton_minion_hit: Handle<AnimationClip>,
     #[asset(path = "models/enemy/Skeleton_Minion.glb#Animation3")]
     pub skeleton_minion_stab: Handle<AnimationClip>,
+    #[asset(path = "models/enemy/Skeleton_Minion.glb#Animation80")]
+    pub skeleton_minion_spell_casting: Handle<AnimationClip>,
+
     
     #[asset(path = "models/enemy/Skeleton_Mage.glb#Scene0")]
     pub skeleton_mage: Handle<Scene>,
@@ -96,6 +99,7 @@ pub struct EnemyAnimationGraphs {
     pub minion_run_fast: AnimationNodeIndex,
     pub minion_spawn: AnimationNodeIndex,
     pub minion_stab: AnimationNodeIndex,
+    pub minion_spellcast: AnimationNodeIndex,
 }
 
 const MINION_UPPER: [&str; 4] = [
@@ -125,6 +129,7 @@ impl FromWorld for EnemyAnimationGraphs {
         let minion_run_fast = graph.add_clip(assets.skeleton_minion_running_fast.clone(), 1.0, graph.root);
         let minion_spawn = graph.add_clip(assets.skeleton_minion_spawn.clone(), 1.0, graph.root);
         let minion_stab = graph.add_clip_with_mask(assets.skeleton_minion_stab.clone(), 0b10, 1.0, graph.root);
+        let minion_spellcast = graph.add_clip(assets.skeleton_minion_spell_casting.clone(), 1.0, graph.root);
     
         EnemyAnimationGraphs {
             minion_graph: world.resource_mut::<Assets<AnimationGraph>>().add(graph),
@@ -134,6 +139,7 @@ impl FromWorld for EnemyAnimationGraphs {
             minion_run_fast,
             minion_spawn,
             minion_stab,
+            minion_spellcast
         }
     }
 }

@@ -42,23 +42,23 @@ pub fn enemy_spell_layer() -> CollisionLayers {
 
 #[derive(Component)]
 pub struct Health {
-    pub max_health: u32,
-    pub current_health: u32,
+    pub max_health: f32,
+    pub current_health: f32,
 }
 
 impl Health {
-    pub fn new(max_health: u32) -> Self {
+    pub fn new(max_health: f32) -> Self {
         Health {
             max_health,
             current_health: max_health,
         }
     }
     
-    pub fn take_damage(&mut self, damage: u32) {
-        self.current_health = self.current_health.saturating_sub(damage);
+    pub fn take_damage(&mut self, damage: f32) {
+        self.current_health -= damage;
     }
     
-    pub fn heal(&mut self, amount: u32) {
+    pub fn heal(&mut self, amount: f32) {
         self.current_health += amount;
         if self.current_health > self.max_health {
             self.current_health = self.max_health;

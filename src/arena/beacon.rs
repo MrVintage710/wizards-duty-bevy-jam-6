@@ -39,7 +39,7 @@ pub fn spawn_beacon(
         Collider::cuboid(1.0, 4.0, 1.0),
         RigidBody::Static,
         Transform::from_rotation(Quat::from_rotation_y(-45.0_f32.to_radians())),
-        Health::new(1000),
+        Health::new(1000.0),
         SceneRootWithAnimation::new(assets.beacon.clone())
             .with_animation_graph(graphs.add(graph))
             .with_animation(id)
@@ -75,6 +75,15 @@ impl<'w> BeaconQuery<'w> {
         let closest = inbetween * range;
         
         closest
+    }
+
+    pub fn towards_beacon(&self, other : &Transform) -> Dir3 {
+        let direction = (other.translation.xz() - self.beacon.0.translation.xz()).normalize_or_zero();
+        Dir3::from_xyz_unchecked(direction.x, 0.0, direction.y)
+    }
+
+    pub fn take_damage(&mut self, damage : f32) {
+        self.beacon.1.take_damage(damage);
     }
     
     pub fn within_range(&self, other : &Transform, range : f32) -> bool {

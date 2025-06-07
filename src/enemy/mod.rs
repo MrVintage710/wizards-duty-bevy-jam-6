@@ -111,6 +111,10 @@ impl EnemyBehavior {
     pub fn is_attack_player(&self) -> bool {
         matches!(self, EnemyBehavior::AttackPlayer)
     }
+
+    pub fn is_atack_beacon(&self) -> bool {
+        matches!(self, EnemyBehavior::AttackBeacon)
+    }
 }
 
 //==============================================================================================
@@ -186,7 +190,7 @@ pub fn check_for_dead_enemies (
     mut enemy_count : ResMut<EnemyCount>
 ) {
     for (entity, enemy) in enemies.iter() {
-        if enemy.current_health == 0 {
+        if enemy.current_health <= 0.0 {
             enemy_count.0 -= 1;
             commands.entity(entity).despawn();
         }

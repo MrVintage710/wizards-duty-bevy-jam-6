@@ -21,7 +21,7 @@ impl Plugin for DamageBoxPlugin {
 //==============================================================================================
 
 #[derive(Component)]
-pub struct SpellDamage(pub u32);
+pub struct SpellDamage(pub f32);
 
 #[derive(Component)]
 pub struct RemoveOnSpellDamage;

@@ -5,7 +5,7 @@ use avian3d::prelude::{Collider, CollisionEventsEnabled, CollisionLayers, Collis
 use bevy::{prelude::*, transform};
 
 pub const PHANTOM_BLADE_COOLDOWN: f32 = 0.3;
-pub const PHANTOM_BLADE_DAMAGE: u32 = 3;
+pub const PHANTOM_BLADE_DAMAGE: f32 = 3.0;
 
 //==============================================================================================
 //        Phantom Blade PLguin

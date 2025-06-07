@@ -2,19 +2,20 @@ use std::f64::consts::PI;
 
 use avian3d::prelude::*;
 use bevy::{animation::AnimationTarget, prelude::*};
-use bevy_tnua::{prelude::*, TnuaNotPlatform};
+use bevy_tnua::{controller, prelude::*, TnuaNotPlatform};
 use bevy_tnua_avian3d::TnuaAvian3dSensorShape;
 use crate::{arena::beacon::BeaconQuery, assets::{EnemyAnimationGraphs, EnemyAssets, WizardAssets}, character::PlayerCharacter, enemy::{Enemy, EnemySpawnAnimationComplete, EnemyType, SpawnEnemy, SpecialEnemyBehavior}, util::{AnimatedModelFor, AnimatedSceneCreated, GameCollisionLayer, Health, SceneRootWithAnimation}};
 
 use super::EnemyBehavior;
 
 const MINION_HEIGHT: f32 = 1.0;
-const MINION_HEALTH: u32 = 5;
+const MINION_HEALTH: f32 = 5.0;
 const MINION_SPEED: f32 = 3.0;
 const MINION_AGRO_RANGE: f32 = 5.0;
 const MINION_ATTACK_COOLDOWN: f32 = 2.0;
 const MINION_ATTACK_RANGE: f32 = 1.5;
-const MINION_BEACON_ATTACK_RANGE: f32 = 2.5;
+const MINION_BEACON_ATTACK_RANGE: f32 = 5.0;
+const MINION_BEACON_DPS : f32 = 5.0;
 
 //==============================================================================================
 //        Minion Plugin
@@ -271,6 +272,7 @@ pub fn minion_idle(
         if enemies_within_agro_range.contains(&entity) {
             *behavior = EnemyBehavior::AttackPlayer;
         } else if beacon.within_range(transform, MINION_BEACON_ATTACK_RANGE) {
+            println!("WITHIN RANGE");
             *behavior = EnemyBehavior::AttackBeacon;
         } else {
             *behavior = EnemyBehavior::goto(beacon.closest_point(transform, MINION_BEACON_ATTACK_RANGE))
@@ -279,5 +281,33 @@ pub fn minion_idle(
 }
 
 //===============================================================================================
-//          Minion 
+//          Minion Attack Beacon
 //===============================================================================================
+
+pub fn minion_attack_beacon(
+    mut minions : Query<(&mut EnemyBehavior, &mut TnuaController, &Transform), With<Minion>>,
+    mut animators : Query<(&AnimatedModelFor, &mut AnimationPlayer)>,
+    mut beacon : BeaconQuery,
+    enemy_animations : Res<EnemyAnimationGraphs>,
+    time : Res<Time>
+) {
+    for (model_for, mut player) in animators.iter_mut() {
+        let Ok((behavior, mut controller, transform)) = minions.get_mut(model_for.0) else { continue };
+        if !behavior.is_atack_beacon() { continue; }
+
+        println!("Attacking Beacon");
+
+        player.play(enemy_animations.minion_spellcast).repeat();
+        player.stop(enemy_animations.minion_run_top);
+        player.stop(enemy_animations.minion_run_bottom);
+
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: (0.0, 0.0, 0.0).into(),
+            float_height: MINION_HEIGHT,
+            desired_forward: Some(beacon.towards_beacon(transform)),
+            ..default()
+        });
+
+        beacon.take_damage(MINION_BEACON_DPS * time.delta_secs());
+    }   
+}
